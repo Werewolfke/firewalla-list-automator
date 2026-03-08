@@ -130,8 +130,10 @@ setup_app_directory() {
     error "Application files not found in ${SCRIPT_DIR}. Run install.sh from the project directory."
   fi
 
-  # Create data directory
+  # Create required directories
   mkdir -p "${APP_DIR}/data"
+  mkdir -p "${APP_DIR}/static/css"
+  mkdir -p "${APP_DIR}/static/js"
 
   # Restore .env if backed up
   if [[ -f "/tmp/.env.backup" ]]; then

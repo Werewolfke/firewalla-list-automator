@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
@@ -59,7 +58,6 @@ async def lifespan(app: FastAPI):
     await scheduler.stop()
 
 app = FastAPI(title="Firewalla Feed Automator", version=APP_VERSION, lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # ── Pages ──────────────────────────────────────────────────────────────────────

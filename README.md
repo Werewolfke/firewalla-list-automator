@@ -73,8 +73,8 @@ Give it read/write access to target lists.
 ## Manual / Development Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/firewalla-feed-automator
-cd firewalla-feed-automator
+git clone https://github.com/Werewolfke/firewalla-list-automator
+cd firewalla-list-automator
 
 python3 -m venv venv
 source venv/bin/activate
@@ -170,13 +170,13 @@ Interactive API docs: **`http://YOUR_IP:8080/docs`**
 
 ```bash
 # Status
-systemctl status firewalla-feed-automator
+systemctl status firewalla-list-automator
 
 # Restart (e.g. after a manual file update)
-systemctl restart firewalla-feed-automator
+systemctl restart firewalla-list-automator
 
 # Live logs
-journalctl -u firewalla-feed-automator -f
+journalctl -u firewalla-list-automator -f
 
 # Uninstall
 sudo bash uninstall.sh
@@ -187,9 +187,9 @@ sudo bash uninstall.sh
 ## Updating
 
 ```bash
-cd /opt/firewalla-feed-automator
+cd /opt/firewalla-list-automator
 git pull
-sudo systemctl restart firewalla-feed-automator
+sudo systemctl restart firewalla-list-automator
 ```
 
 The version badge in the top-right of the dashboard will show a yellow **⚠ refresh?** if the page you have open is older than the running server — just hit **Ctrl+Shift+R** to hard-refresh.
@@ -236,3 +236,18 @@ https://github.com/firehol/blocklist-ipsets
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+## Honesty
+
+This project is build with ai. (does not contain ai or external api calls.)
+It has been tested, and does not do anything that it is not expected to do.
+Can be completely isolated except for the firewalla api calls and list sources. 
+Bugs can ofcourse occur, always welcome to report them. 
+
+This project was made for myself, and I do use it.
+Sharing this under MIT license for people who want to build further on it (as I am nowhere near a expert.)
+
+Don't install this directly on ur firewalla, install this on a vm or other sort of virtualised environment. 
+Ofcourse u are free to do as u want, but firewalls should be used as firewalls in my opinion. Anything u install extra on it, is another security breach waiting to happen. 

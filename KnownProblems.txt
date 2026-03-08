@@ -1,0 +1,2 @@
+This is a list of problems that still need to be fixed;
+- Notes do not go trought to the MSP page yet. Notes stay empty on the MSP page eventhough they are filled in on the WebGui.

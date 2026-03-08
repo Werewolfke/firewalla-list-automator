@@ -217,6 +217,10 @@ https://github.com/firehol/blocklist-ipsets
 
 ---
 
+<img width="1302" height="540" alt="image" src="https://github.com/user-attachments/assets/ed9a3434-a469-4607-943b-bf0fc3669983" />
+
+
+
 ## Tech Stack
 
 | Component | Technology |

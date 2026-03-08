@@ -8,7 +8,9 @@
 
 set -euo pipefail
 
-APP_NAME="firewalla-feed-automator"
+# APP_NAME derived from this script's folder — works regardless of what you named it
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+APP_NAME="$(basename "${SCRIPT_DIR}")"
 APP_DIR="/opt/${APP_NAME}"
 APP_USER="fwautomator"
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"

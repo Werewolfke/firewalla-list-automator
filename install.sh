@@ -8,7 +8,10 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-APP_NAME="firewalla-feed-automator"
+# APP_NAME is derived from the folder this script lives in, so renaming the
+# project directory (e.g. firewalla-list-automator) works without editing anything.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+APP_NAME="$(basename "${SCRIPT_DIR}")"
 APP_DIR="/opt/${APP_NAME}"
 APP_USER="fwautomator"
 APP_PORT=8080
@@ -121,8 +124,6 @@ setup_app_directory() {
 
   # Copy application files
   mkdir -p "${APP_DIR}"
-  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
   if [[ -f "${SCRIPT_DIR}/app.py" ]]; then
     cp -r "${SCRIPT_DIR}/." "${APP_DIR}/"
   else

@@ -36,8 +36,8 @@ Subscribe to external blocklists (Pi-hole, AdGuard, EasyList format, etc.) and a
 ## Quick Start
 
 ```bash
-git clone https://github.com/Werewolfke/firewalla-list-automator
-cd firewalla-feed-automator
+git clone git clone https://github.com/Werewolfke/firewalla-list-automator
+cd firewalla-list-automator
 sudo bash install.sh
 ```
 
@@ -49,7 +49,7 @@ The installer will:
 5. Register and start a `systemd` service on port `8080`
 
 Then open: **`http://YOUR_SERVER_IP:8080`**
-(DONT PUBLISH THIS ONLINE! KEEP THIS LOCAL!)
+(DONT PUBLISH THIS ONLINE! Keep this LOCAL!)
 
 ---
 

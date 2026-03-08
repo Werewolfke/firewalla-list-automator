@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Firewalla Feed Automator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--r:#ff3b30;--o:#ff6a00;--bg:#0a0c0f;--sf:#111318;--cd:#161a21;--br:#252b35;--mt:#3a4150;--tx:#e2e8f2;--sb:#7a8599;--gn:#00d084;--yw:#ffd60a;--bl:#0a84ff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(255,59,48,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,59,48,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.mono{font-family:'IBM Plex Mono',monospace}
+.hdr{background:linear-gradient(135deg,var(--sf),#1a0f0e);border-bottom:1px solid var(--br);position:relative}
+.hdr::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--r),var(--o),transparent);opacity:.5}
+.card{background:var(--cd);border:1px solid var(--br);border-radius:8px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent)}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sdot.ok{background:var(--gn);box-shadow:0 0 6px var(--gn)}
+.sdot.error{background:var(--r);box-shadow:0 0 6px var(--r);animation:pr 2s infinite}
+.sdot.syncing{background:var(--bl);box-shadow:0 0 6px var(--bl);animation:pb 1s infinite}
+.sdot.pending,.sdot.queued{background:var(--yw);box-shadow:0 0 6px var(--yw)}
+.sdot.unconfigured{background:var(--mt)}
+@keyframes pr{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes pb{0%,100%{opacity:1}50%{opacity:.5}}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:none;font-family:inherit}
+.btn-p{background:linear-gradient(135deg,var(--r),var(--o));color:#fff}
+.btn-p:hover{opacity:.85;transform:translateY(-1px)}
+.btn-g{background:transparent;color:var(--sb);border:1px solid var(--br)}
+.btn-g:hover{border-color:var(--mt);color:var(--tx);background:rgba(255,255,255,.03)}
+.btn-d{background:rgba(255,59,48,.1);color:var(--r);border:1px solid rgba(255,59,48,.2)}
+.btn-d:hover{background:rgba(255,59,48,.2)}
+.btn-s{background:rgba(10,132,255,.1);color:var(--bl);border:1px solid rgba(10,132,255,.2)}
+.btn-s:hover{background:rgba(10,132,255,.2)}
+.btn-e{background:rgba(255,214,10,.1);color:var(--yw);border:1px solid rgba(255,214,10,.2)}
+.btn-e:hover{background:rgba(255,214,10,.2)}
+.sm{padding:5px 10px;font-size:12px}
+.inp{width:100%;background:var(--sf);border:1px solid var(--br);border-radius:6px;padding:10px 14px;color:var(--tx);font-size:14px;font-family:inherit;transition:border-color .15s;outline:none}
+.inp:focus{border-color:var(--r)}
+.inp::placeholder{color:var(--mt)}
+select.inp option{background:var(--sf)}
+.lbl{display:block;font-size:12px;font-weight:500;color:var(--sb);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase}
+.bdg{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;font-family:'IBM Plex Mono',monospace}
+.bg{background:rgba(0,208,132,.12);color:var(--gn)}
+.br2{background:rgba(255,59,48,.12);color:var(--r)}
+.bb{background:rgba(10,132,255,.12);color:var(--bl)}
+.by{background:rgba(255,214,10,.12);color:var(--yw)}
+.bgr{background:rgba(122,133,153,.12);color:var(--sb)}
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
+.ov.open{display:flex}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--cd);border:1px solid var(--br);border-radius:8px;padding:14px 18px;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .25s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:10px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-left:3px solid var(--gn)}
+.toast.error{border-left:3px solid var(--r)}
+.toast.info{border-left:3px solid var(--bl)}
+.nav-tab{padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;border-radius:6px;color:var(--sb);transition:all .15s;border:none;background:transparent;font-family:inherit}
+.nav-tab.active{background:rgba(255,59,48,.12);color:var(--r)}
+.nav-tab:hover:not(.active){color:var(--tx);background:rgba(255,255,255,.04)}
+.sc{max-height:380px;overflow-y:auto}
+.sc::-webkit-scrollbar{width:4px}
+.sc::-webkit-scrollbar-track{background:var(--sf)}
+.sc::-webkit-scrollbar-thumb{background:var(--mt);border-radius:2px}
+.stat-c{background:var(--cd);border:1px solid var(--br);border-radius:8px;padding:20px;position:relative;overflow:hidden}
+.stat-a{position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,var(--r),var(--o));border-radius:8px 0 0 8px}
+.page{display:none}
+.page.active{display:block}
+.log-row{padding:8px 12px;border-bottom:1px solid var(--br);font-size:12px;font-family:'IBM Plex Mono',monospace}
+.log-row:hover{background:rgba(255,255,255,.02)}
+.tag-chip{display:inline-flex;align-items:center;padding:2px 8px;background:rgba(10,132,255,.1);color:var(--bl);border-radius:20px;font-size:11px;margin:2px}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--mt);border-radius:20px;transition:.3s}
+.slider:before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+input:checked+.slider{background:var(--gn)}
+input:checked+.slider:before{transform:translateX(16px)}
+.mode-selected{border-color:var(--bl)!important;background:rgba(10,132,255,.04)}
+.preview-box{border-radius:8px;padding:14px;border:1px solid;font-size:13px}
+.preview-ok{border-color:rgba(0,208,132,.3);background:rgba(0,208,132,.06)}
+.preview-err{border-color:rgba(255,59,48,.3);background:rgba(255,59,48,.06)}
+</style>
+</head>
+<body style="position:relative;z-index:1">
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="hdr px-6 py-4">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <rect width="36" height="36" rx="8" fill="url(#lg)"/>
+        <path d="M10 12h16M10 18h10M10 24h13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="28" cy="18" r="5" fill="white" opacity=".15"/>
+        <path d="M26 18l1.5 1.5L30 16" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stop-color="#ff3b30"/><stop offset="100%" stop-color="#ff6a00"/></linearGradient></defs>
+      </svg>
+      <div>
+        <h1 class="text-base font-semibold" style="letter-spacing:-.01em">Firewalla Feed Automator</h1>
+        <p class="text-xs mono" style="color:var(--sb)">MSP Blocklist Manager</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="apiBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs mono" style="background:var(--sf);border:1px solid var(--br)">
+        <span class="sdot" id="apiDot"></span>
+        <span id="apiTxt">Checking…</span>
+      </div>
+      <div class="flex gap-1 p-1 rounded-lg" style="background:var(--sf);border:1px solid var(--br)">
+        <button class="nav-tab active" onclick="showPage('subs',this)">Subscriptions</button>
+        <button class="nav-tab" onclick="showPage('logs',this)">App Logs</button>
+        <button class="nav-tab" onclick="showPage('settings',this)">Settings</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE: SUBSCRIPTIONS
+════════════════════════════════════════════════════════════════════ -->
+<div id="page-subs" class="page active">
+
+  <!-- Stats -->
+  <div class="grid gap-4 mb-8" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat-c"><div class="stat-a"></div><div class="ml-3"><p class="text-xs mono mb-1" style="color:var(--sb);letter-spacing:.05em">SUBSCRIPTIONS</p><p class="text-3xl font-semibold mono" id="stTotal">—</p></div></div>
+    <div class="stat-c"><div class="stat-a" style="background:linear-gradient(180deg,var(--gn),#00a065)"></div><div class="ml-3"><p class="text-xs mono mb-1" style="color:var(--sb);letter-spacing:.05em">FW LISTS</p><p class="text-3xl font-semibold mono" id="stLists">—</p></div></div>
+    <div class="stat-c"><div class="stat-a" style="background:linear-gradient(180deg,var(--bl),#0060cc)"></div><div class="ml-3"><p class="text-xs mono mb-1" style="color:var(--sb);letter-spacing:.05em">TOTAL ENTRIES</p><p class="text-3xl font-semibold mono" id="stEntries">—</p></div></div>
+    <div class="stat-c"><div class="stat-a" style="background:linear-gradient(180deg,var(--yw),#e6a800)"></div><div class="ml-3"><p class="text-xs mono mb-1" style="color:var(--sb);letter-spacing:.05em">ERRORS</p><p class="text-3xl font-semibold mono" id="stErrors">—</p></div></div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="px-6 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--br)">
+      <h2 class="text-sm font-semibold">Active Subscriptions</h2>
+      <div class="flex gap-2">
+        <button class="btn btn-g sm" onclick="loadSubs()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 6A5 5 0 1 1 6 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11 1v3H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn-p" onclick="openAddModal()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add Subscription
+        </button>
+      </div>
+    </div>
+    <div id="subsWrap">
+      <div style="text-align:center;padding:60px 20px;color:var(--sb)">
+        <div class="spin" style="width:24px;height:24px;margin:0 auto 12px"></div>
+        <p class="text-sm">Loading…</p>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-subs -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE: APP LOGS
+════════════════════════════════════════════════════════════════════ -->
+<div id="page-logs" class="page">
+  <div class="card">
+    <div class="px-6 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--br)">
+      <h2 class="text-sm font-semibold">Application Logs</h2>
+      <div class="flex items-center gap-3">
+        <select id="logLevel" class="inp" style="width:auto;padding:5px 10px;font-size:12px" onchange="loadAppLogs()">
+          <option value="INFO">INFO+</option>
+          <option value="WARNING">WARNING+</option>
+          <option value="ERROR">ERROR only</option>
+          <option value="DEBUG">DEBUG (all)</option>
+        </select>
+        <button class="btn btn-g sm" onclick="loadAppLogs()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M11 6A5 5 0 1 1 6 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11 1v3H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn-d sm" onclick="clearLogs()">Clear</button>
+      </div>
+    </div>
+    <div id="appLogsWrap" class="sc" style="max-height:600px">
+      <div style="text-align:center;padding:40px;color:var(--sb)"><p class="text-sm">Loading logs…</p></div>
+    </div>
+  </div>
+</div><!-- /page-logs -->
+
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE: SETTINGS
+════════════════════════════════════════════════════════════════════ -->
+<div id="page-settings" class="page">
+  <div class="grid gap-6" style="grid-template-columns:1fr 1fr">
+
+    <!-- Connection settings -->
+    <div class="card p-6">
+      <h3 class="text-sm font-semibold mb-1">Firewalla MSP Connection</h3>
+      <p class="text-xs mb-5" style="color:var(--sb)">Settings are saved to the database and take effect immediately — no restart needed.</p>
+
+      <div class="mb-4">
+        <label class="lbl">MSP Domain</label>
+        <input id="cfgDomain" type="text" class="inp" placeholder="mydomain.firewalla.net"/>
+        <p class="text-xs mt-1" style="color:var(--sb)">The <code style="color:var(--r)">{id}</code> part of <code style="color:var(--sb)">{id}.firewalla.net</code></p>
+      </div>
+      <div class="mb-5">
+        <label class="lbl">API Key (Personal Access Token)</label>
+        <div style="position:relative">
+          <input id="cfgKey" type="password" class="inp" placeholder="Enter new key to update…"/>
+          <button onclick="toggleKeyVis()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--sb)" id="keyToggleBtn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" id="eyeIcon"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
+        </div>
+        <p class="text-xs mt-1" style="color:var(--sb)" id="keyHint">Leave blank to keep current key</p>
+      </div>
+      <div class="mb-5">
+        <label class="lbl">Max Entries Per List</label>
+        <input id="cfgMax" type="number" class="inp" value="2000" min="100" max="2000"/>
+        <p class="text-xs mt-1" style="color:var(--sb)">Firewalla hard limit is 2000. Lower to be safe.</p>
+      </div>
+      <div class="flex gap-3">
+        <button class="btn btn-p" onclick="saveSettings()">Save & Test Connection</button>
+        <button class="btn btn-g" onclick="testConnection()">Test Only</button>
+      </div>
+      <div id="connResult" class="mt-4 hidden"></div>
+    </div>
+
+    <!-- Info / tips card -->
+    <div class="card p-6">
+      <h3 class="text-sm font-semibold mb-4">About &amp; Tips</h3>
+      <div class="space-y-4 text-sm" style="color:var(--sb)">
+        <div>
+          <p class="font-medium mb-1" style="color:var(--tx)">Finding your MSP Domain</p>
+          <p>Log in to the Firewalla MSP portal. Your URL will be <code class="mono" style="color:var(--r)">https://yourid.firewalla.net</code> — use only <code class="mono" style="color:var(--r)">yourid.firewalla.net</code> as the domain.</p>
+        </div>
+        <div>
+          <p class="font-medium mb-1" style="color:var(--tx)">Getting an API Key</p>
+          <p>In the MSP portal → Profile → Personal Access Tokens → Generate new token. Give it read/write access to target lists.</p>
+        </div>
+        <div>
+          <p class="font-medium mb-1" style="color:var(--tx)">The 2000-row Split</p>
+          <p>Lists larger than the limit are auto-split into <code class="mono" style="color:var(--r)">Name_Part1</code>, <code class="mono" style="color:var(--r)">Name_Part2</code>, etc. Orphan parts are deleted automatically when a list shrinks.</p>
+        </div>
+        <div>
+          <p class="font-medium mb-1" style="color:var(--tx)">Popular blocklist URLs</p>
+          <div class="space-y-1 mt-2">
+            <div class="text-xs mono p-2 rounded" style="background:var(--sf);color:var(--bl);cursor:pointer" onclick="copyText(this)" title="Click to copy">https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts</div>
+            <div class="text-xs mono p-2 rounded" style="background:var(--sf);color:var(--bl);cursor:pointer" onclick="copyText(this)" title="Click to copy">https://adaway.org/hosts.txt</div>
+            <div class="text-xs mono p-2 rounded" style="background:var(--sf);color:var(--bl);cursor:pointer" onclick="copyText(this)" title="Click to copy">https://v.firebog.net/hosts/AdguardDNS.txt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-settings -->
+
+</main><!-- /main -->
+
+<!-- ════════════ ADD SUBSCRIPTION MODAL ════════════ -->
+<div class="ov" id="addModal">
+  <div class="card w-full mx-4" style="max-width:640px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="px-6 py-4 flex items-center justify-between flex-shrink-0" style="border-bottom:1px solid var(--br)">
+      <h2 class="text-base font-semibold">Add Subscription</h2>
+      <button onclick="closeAddModal()" style="color:var(--sb);background:none;border:none;cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <form id="addForm" onsubmit="submitAdd(event)" style="overflow-y:auto;flex:1;padding:24px">
+
+      <!-- URLs -->
+      <div class="mb-3">
+        <label class="lbl">Source URL(s)</label>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <textarea id="aUrl" class="inp" rows="3" placeholder="https://example.com/list.txt&#10;https://another.com/list2.txt&#10;(one URL per line)" required
+            style="resize:vertical;min-height:72px" oninput="clearPreview()"></textarea>
+          <button type="button" class="btn btn-s" id="previewBtn" onclick="runPreview()"
+            style="white-space:nowrap;flex-shrink:0;height:40px">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="m8.5 8.5 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Analyse
+          </button>
+        </div>
+        <p class="text-xs mt-1" style="color:var(--sb)">One URL per line. Multiple lists are combined, deduplicated, then distributed.</p>
+      </div>
+
+      <!-- Preview panel -->
+      <div id="previewResult" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Name + interval + type -->
+      <div class="mb-4">
+        <label class="lbl">Display Name</label>
+        <input id="aName" type="text" class="inp" placeholder="e.g. EasyList Ad Block" required/>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="lbl">Sync Interval</label>
+          <select id="aInterval" class="inp">
+            <option value="1">Every 1 hour</option><option value="6">Every 6 hours</option>
+            <option value="12">Every 12 hours</option><option value="24" selected>Daily (24h)</option>
+            <option value="48">Every 2 days</option><option value="168">Weekly</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">List Type</label>
+          <select id="aType" class="inp">
+            <option value="domain" selected>Domain</option>
+            <option value="ip">IP Address</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Slot Allocation (always visible, not hidden behind analyse) -->
+      <div style="border:1px solid var(--br);border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <div class="px-4 py-3" style="background:rgba(10,132,255,.06);border-bottom:1px solid var(--br)">
+          <p class="text-xs font-semibold" style="color:var(--bl);letter-spacing:.05em;text-transform:uppercase">Slot Allocation Strategy</p>
+          <p class="text-xs mt-0.5" style="color:var(--sb)">Controls how many Firewalla target lists are used. Run Analyse first for smart suggestions.</p>
+        </div>
+        <div class="p-4" style="display:flex;flex-direction:column;gap:10px">
+
+          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblAuto">
+            <input type="radio" name="aSlotMode" value="auto" id="modeAuto" checked style="margin-top:3px;accent-color:var(--bl)"/>
+            <div>
+              <p class="text-sm font-medium">Auto <span class="bdg bgr" style="font-size:10px;margin-left:4px">dynamic</span></p>
+              <p class="text-xs" style="color:var(--sb)">Lists grow &amp; shrink with the source. New lists won't automatically be in your groups.</p>
+            </div>
+          </label>
+
+          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblFixed">
+            <input type="radio" name="aSlotMode" value="fixed" id="modeFixed" style="margin-top:3px;accent-color:var(--gn)"/>
+            <div style="flex:1">
+              <p class="text-sm font-medium">Fixed slots <span class="bdg bg" style="font-size:10px;margin-left:4px">recommended</span></p>
+              <p class="text-xs" style="color:var(--sb)">Exactly N lists, created once, never deleted. Assign to groups once — content updates in place.</p>
+              <div id="fixedSlotInput" style="display:none;margin-top:10px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div>
+                    <p class="lbl" style="margin-bottom:4px">Number of slots</p>
+                    <input id="aFixedSlots" type="number" class="inp" style="width:110px" min="1" max="500" placeholder="e.g. 25" oninput="updateSlotCalc()"/>
+                  </div>
+                  <div id="slotCalcResult" style="font-size:12px;color:var(--sb);font-family:'IBM Plex Mono',monospace"></div>
+                </div>
+                <div id="slotSuggestions" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+              </div>
+            </div>
+          </label>
+
+          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblRotate">
+            <input type="radio" name="aSlotMode" value="rotate" id="modeRotate" style="margin-top:3px;accent-color:var(--yw)"/>
+            <div style="flex:1">
+              <p class="text-sm font-medium">Rotating coverage <span class="bdg by" style="font-size:10px;margin-left:4px">partial</span></p>
+              <p class="text-xs" style="color:var(--sb)">Fewer slots than needed. Full list is shuffled each sync; different entries blocked each cycle.</p>
+              <div id="rotateSlotInput" style="display:none;margin-top:10px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div>
+                    <p class="lbl" style="margin-bottom:4px">Number of slots</p>
+                    <input id="aRotateSlots" type="number" class="inp" style="width:110px" min="1" max="500" placeholder="e.g. 5" oninput="updateRotateCalc()"/>
+                  </div>
+                  <div id="rotateCalcResult" style="font-size:12px;color:var(--sb);font-family:'IBM Plex Mono',monospace"></div>
+                </div>
+              </div>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="lbl">Tags (optional)</label>
+        <input id="aTags" type="text" class="inp" placeholder="ads, tracking, malware"/>
+      </div>
+      <div class="mb-5">
+        <label class="lbl">Notes (optional)</label>
+        <input id="aNotes" type="text" class="inp" placeholder="Any notes…"/>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" class="btn btn-g" onclick="closeAddModal()">Cancel</button>
+        <button type="submit" class="btn btn-p" id="addBtn">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add &amp; Sync
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ════════════ EDIT SUBSCRIPTION MODAL ════════════ -->
+<div class="ov" id="editModal">
+  <div class="card w-full mx-4" style="max-width:560px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="px-6 py-4 flex items-center justify-between flex-shrink-0" style="border-bottom:1px solid var(--br)">
+      <h2 class="text-base font-semibold">Edit Subscription</h2>
+      <button onclick="closeEditModal()" style="color:var(--sb);background:none;border:none;cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <form id="editForm" onsubmit="submitEdit(event)" style="overflow-y:auto;flex:1;padding:24px">
+      <input type="hidden" id="eId"/>
+      <div class="mb-4">
+        <label class="lbl">Display Name</label>
+        <input id="eName" type="text" class="inp" required/>
+      </div>
+      <div class="mb-4">
+        <label class="lbl">Source URL(s)</label>
+        <textarea id="eUrl" class="inp" rows="3" required style="resize:vertical;min-height:72px"></textarea>
+        <p class="text-xs mt-1" style="color:var(--sb)">One URL per line. Multiple lists are combined and deduplicated.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="lbl">Sync Interval</label>
+          <select id="eInterval" class="inp">
+            <option value="1">Every 1 hour</option><option value="6">Every 6 hours</option>
+            <option value="12">Every 12 hours</option><option value="24">Daily (24h)</option>
+            <option value="48">Every 2 days</option><option value="168">Weekly</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Enabled</label>
+          <div style="display:flex;align-items:center;height:42px;gap:10px">
+            <label class="toggle"><input type="checkbox" id="eEnabled"/><span class="slider"></span></label>
+            <span id="eEnabledLbl" class="text-sm" style="color:var(--sb)">Enabled</span>
+          </div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--br);border-radius:8px;padding:14px;margin-bottom:16px">
+        <p class="lbl mb-3">Slot Allocation</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="lbl">Mode</label>
+            <select id="eSlotMode" class="inp" onchange="onEditModeChange()">
+              <option value="auto">Auto (dynamic)</option>
+              <option value="fixed">Fixed slots</option>
+              <option value="rotate">Rotating coverage</option>
+            </select>
+          </div>
+          <div id="eSlotCountWrap">
+            <label class="lbl">Allocated Slots</label>
+            <input id="eAllocSlots" type="number" class="inp" min="1" max="500" placeholder="e.g. 25"/>
+          </div>
+        </div>
+        <p id="eSlotHint" class="text-xs mt-2" style="color:var(--sb)"></p>
+      </div>
+      <div class="mb-4">
+        <label class="lbl">Tags</label>
+        <input id="eTags" type="text" class="inp" placeholder="ads, tracking, malware"/>
+      </div>
+      <div class="mb-5">
+        <label class="lbl">Notes</label>
+        <input id="eNotes" type="text" class="inp"/>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" class="btn btn-g" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-p">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ════════════ DETAIL / LOGS MODAL ════════════ -->
+<div class="ov" id="detailModal">
+  <div class="card w-full mx-4 p-6" style="max-width:680px;max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-base font-semibold" id="dtTitle">Details</h2>
+      <button onclick="closeDetailModal()" style="color:var(--sb);background:none;border:none;cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div id="dtParts" class="mb-5"></div>
+    <div>
+      <p class="lbl mb-3">Sync History</p>
+      <div class="sc" id="dtLogs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span id="tIcon"></span><span id="tMsg"></span></div>
+
+<script>
+const API='';
+let _subs=[], _previewData=null;
+
+// ── Navigation ──────────────────────────────────────────────────────────
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(id==='logs')loadAppLogs();
+  if(id==='settings')loadSettings();
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────
+function toast(msg,type='info'){
+  const t=document.getElementById('toast');
+  document.getElementById('tIcon').textContent=type==='success'?'✓':type==='error'?'✗':'ℹ';
+  document.getElementById('tMsg').textContent=msg;
+  t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),3800);
+}
+
+// ── Health ──────────────────────────────────────────────────────────────
+async function checkHealth(){
+  try{
+    const d=await(await fetch('/api/health')).json();
+    const fw=d.firewalla_api;
+    document.getElementById('apiDot').className='sdot '+fw.status;
+    document.getElementById('apiTxt').textContent=fw.message||fw.status;
+  }catch{
+    document.getElementById('apiDot').className='sdot error';
+    document.getElementById('apiTxt').textContent='Unreachable';
+  }
+}
+
+// ── Load Subscriptions ──────────────────────────────────────────────────
+async function loadSubs(){
+  try{
+    _subs=await(await fetch('/api/subscriptions')).json();
+    renderSubs(_subs); updateStats(_subs);
+  }catch{
+    document.getElementById('subsWrap').innerHTML=
+      '<div style="text-align:center;padding:60px;color:var(--r)"><p class="text-sm">Failed to load</p></div>';
+  }
+}
+
+function updateStats(subs){
+  document.getElementById('stTotal').textContent=subs.length;
+  document.getElementById('stLists').textContent=subs.reduce((a,s)=>a+(s.part_count||0),0);
+  const e=subs.reduce((a,s)=>a+(s.total_entries||0),0);
+  document.getElementById('stEntries').textContent=e>999?`${(e/1000).toFixed(1)}k`:e;
+  document.getElementById('stErrors').textContent=subs.filter(s=>s.sync_status==='error').length;
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function ivl(h){return{1:'1h',6:'6h',12:'12h',24:'24h',48:'2d',168:'7d'}[h]||`${h}h`}
+function ago(iso){
+  if(!iso)return'—';
+  const d=Date.now()-new Date(iso+(iso.endsWith('Z')?'':'Z'));
+  const m=Math.floor(d/60000);
+  if(m<1)return'just now';if(m<60)return`${m}m ago`;
+  const h=Math.floor(m/60);if(h<24)return`${h}h ago`;return`${Math.floor(h/24)}d ago`;
+}
+function fmtDate(iso){
+  if(!iso)return'—';
+  const d=new Date(iso+(iso.endsWith('Z')?'':'Z'));
+  return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function slotBadge(mode,slots){
+  if(!mode||mode==='auto')return'<span class="bdg bgr">auto</span>';
+  if(mode==='fixed')return`<span class="bdg bg">${slots||'?'} fixed</span>`;
+  if(mode==='rotate')return`<span class="bdg by">${slots||'?'} rotate</span>`;
+  return`<span class="bdg bgr">${esc(mode)}</span>`;
+}
+function sbadge(status){
+  const m={ok:['bg','● synced'],error:['br2','✗ error'],syncing:['bb','⟳ syncing'],
+    pending:['by','◌ pending'],queued:['by','◌ queued'],skipped:['bgr','— skipped']};
+  const[c,l]=m[status]||['bgr',status];
+  return`<span class="bdg ${c}">${l}</span>`;
+}
+
+// ── Render table ────────────────────────────────────────────────────────
+function renderSubs(subs){
+  const el=document.getElementById('subsWrap');
+  if(!subs.length){
+    el.innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--sb)">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 16px;opacity:.3">
+        <rect x="8" y="8" width="32" height="32" rx="6" stroke="currentColor" stroke-width="2"/>
+        <path d="M16 24h16M16 18h10M16 30h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p class="text-sm font-medium mb-1">No subscriptions yet</p>
+      <p class="text-xs" style="color:var(--mt)">Click "Add Subscription" to get started</p></div>`;
+    return;
+  }
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--br)">
+      <th class="px-6 py-3 text-left"   style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">NAME / URL</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">STATUS</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">LISTS</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">ENTRIES</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">INTERVAL</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">SLOTS</th>
+      <th class="px-4 py-3 text-center" style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">LAST SYNC</th>
+      <th class="px-4 py-3 text-right"  style="font-size:11px;font-weight:500;color:var(--sb);letter-spacing:.06em">ACTIONS</th>
+    </tr></thead>
+    <tbody>${subs.map(s=>subRow(s)).join('')}</tbody>
+  </table>`;
+}
+
+function subRow(s){
+  const tags=(s.tags||'').split(',').filter(Boolean);
+  const urlCount=(s.source_url||'').split(/[\n\r,]+/).filter(u=>u.trim().startsWith('http')).length;
+  return`<tr style="border-bottom:1px solid var(--br);transition:background .1s"
+    onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
+    <td class="px-6 py-4">
+      <div class="flex items-center gap-3">
+        <span class="sdot ${s.enabled?(s.sync_status||'pending'):'unconfigured'}"></span>
+        <div>
+          <div class="flex items-center gap-2">
+            <p class="text-sm font-medium">${esc(s.name)}</p>
+            ${!s.enabled?'<span class="bdg br2">disabled</span>':''}
+            ${urlCount>1?`<span class="bdg bb" style="font-size:10px">${urlCount} sources</span>`:''}
+          </div>
+          <p class="text-xs mono" style="color:var(--sb);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.source_url)}">${esc((s.source_url||'').split(/[\n\r]+/)[0])}</p>
+          ${tags.length?`<div style="margin-top:3px">${tags.map(t=>`<span class="tag-chip">${esc(t.trim())}</span>`).join('')}</div>`:''}
+        </div>
+      </div>
+    </td>
+    <td class="px-4 py-4 text-center">${sbadge(s.sync_status||'pending')}</td>
+    <td class="px-4 py-4 text-center mono text-sm">${s.part_count||0}${(s.part_count||0)>1?'<span style="color:var(--sb);font-size:10px"> pts</span>':''}</td>
+    <td class="px-4 py-4 text-center mono text-sm">${(s.total_entries||0)>999?((s.total_entries/1000).toFixed(1)+'k'):(s.total_entries||0)}</td>
+    <td class="px-4 py-4 text-center"><span class="bdg bgr">${ivl(s.sync_interval_hours)}</span></td>
+    <td class="px-4 py-4 text-center">${slotBadge(s.slot_mode,s.allocated_slots)}</td>
+    <td class="px-4 py-4 text-center text-xs" style="color:var(--sb)">${ago(s.last_synced_at)}</td>
+    <td class="px-4 py-4">
+      <div class="flex items-center justify-end gap-1">
+        <button class="btn btn-s sm" onclick="triggerSync(${s.id},'${esc(s.name)}')" title="Sync now">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M10 5.5A4.5 4.5 0 1 1 5.5 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10 1v3H7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sync
+        </button>
+        <button class="btn btn-e sm" onclick="openEditModal(${s.id})" title="Edit">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M7.5 1.5l2 2L3 10H1V8L7.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Edit
+        </button>
+        <button class="btn btn-g sm" onclick="openDetail(${s.id},'${esc(s.name)}')" title="View logs">Logs</button>
+        <button class="btn btn-d sm" onclick="deleteSub(${s.id},'${esc(s.name)}')" title="Delete">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 2.5h8M3.5 2.5V1.5h3v1M1.5 2.5l.5 6h6l.5-6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+// ── Add Modal ───────────────────────────────────────────────────────────
+function openAddModal(){document.getElementById('addModal').classList.add('open')}
+function closeAddModal(){
+  document.getElementById('addModal').classList.remove('open');
+  document.getElementById('addForm').reset();
+  _previewData=null;
+  document.getElementById('previewResult').style.display='none';
+  document.getElementById('fixedSlotInput').style.display='none';
+  document.getElementById('rotateSlotInput').style.display='none';
+  ['lblAuto','lblFixed','lblRotate'].forEach(id=>document.getElementById(id).style.borderColor='');
+  document.getElementById('lblAuto').style.borderColor='var(--br)';
+  document.getElementById('modeAuto').checked=true;
+}
+function clearPreview(){
+  _previewData=null;
+  document.getElementById('previewResult').style.display='none';
+}
+
+async function runPreview(){
+  const urlRaw=document.getElementById('aUrl').value.trim();
+  if(!urlRaw){toast('Enter at least one URL','error');return;}
+  const btn=document.getElementById('previewBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  const box=document.getElementById('previewResult');
+  box.style.display='block';
+  box.style.cssText='display:block;border:1px solid var(--br);border-radius:8px;padding:14px;margin-bottom:0;font-size:13px';
+  box.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:var(--sb)"><span class="spin"></span> Fetching and analysing…</div>';
+  try{
+    const r=await fetch('/api/preview?url='+encodeURIComponent(urlRaw));
+    const d=await r.json(); _previewData=d;
+    if(d.ok){
+      box.style.borderColor='rgba(0,208,132,.3)';box.style.background='rgba(0,208,132,.06)';
+      let urlDetail='';
+      if(d.url_stats&&d.url_stats.length>1){
+        urlDetail=`<div style="margin-top:10px;font-size:11px;font-family:'IBM Plex Mono',monospace">
+          ${d.url_stats.map(u=>u.error
+            ?`<div style="color:var(--r)">✗ ${esc(u.url)}: ${esc(u.error)}</div>`
+            :`<div style="color:var(--sb)">✓ <span style="color:var(--tx)">${u.entries.toLocaleString()}</span> entries (+${u.added_unique.toLocaleString()} unique) — ${esc(u.url)}</div>`
+          ).join('')}</div>`;
+      }
+      box.innerHTML=`
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
+          <div><p style="font-size:10px;color:var(--gn);letter-spacing:.06em;text-transform:uppercase">TOTAL UNIQUE</p>
+               <p style="font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--gn)">${d.total_entries.toLocaleString()}</p></div>
+          <div><p style="font-size:10px;color:var(--gn);letter-spacing:.06em;text-transform:uppercase">MIN SLOTS</p>
+               <p style="font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--gn)">${d.min_slots_needed}</p></div>
+          <div><p style="font-size:10px;color:var(--gn);letter-spacing:.06em;text-transform:uppercase">SOURCES</p>
+               <p style="font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--gn)">${d.url_count}</p></div>
+        </div>
+        ${d.sample?.length?`<p style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--sb)">${d.sample.join(', ')}…</p>`:''}
+        ${urlDetail}`;
+      // Pre-fill suggestions
+      const min=d.min_slots_needed;
+      document.getElementById('aFixedSlots').value=min+Math.ceil(min*.2);
+      document.getElementById('aRotateSlots').value=Math.max(1,Math.floor(min/2));
+      buildSuggestions(min);
+      updateSlotCalc(); updateRotateCalc();
+    }else{
+      box.style.borderColor='rgba(255,59,48,.3)';box.style.background='rgba(255,59,48,.06)';
+      box.innerHTML=`<p style="color:var(--r)">✗ ${esc(d.error)}</p>`;
+    }
+  }catch(e){
+    box.style.borderColor='rgba(255,59,48,.3)';box.style.background='rgba(255,59,48,.06)';
+    box.innerHTML=`<p style="color:var(--r)">✗ ${esc(e.message)}</p>`;
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="m8.5 8.5 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> Analyse';
+  }
+}
+
+function buildSuggestions(min){
+  const el=document.getElementById('slotSuggestions');
+  const opts=[
+    {label:`Min (${min})`,v:min},
+    {label:`+20% (${min+Math.ceil(min*.2)})`,v:min+Math.ceil(min*.2)},
+    {label:`+50% (${min+Math.ceil(min*.5)})`,v:min+Math.ceil(min*.5)},
+    {label:`2× (${min*2})`,v:min*2},
+  ];
+  el.innerHTML=opts.map(o=>
+    `<button type="button" class="btn btn-g" style="font-size:11px;padding:4px 10px;font-family:'IBM Plex Mono',monospace"
+      onclick="document.getElementById('aFixedSlots').value=${o.v};updateSlotCalc()">${o.label}</button>`
+  ).join('');
+}
+
+function onModeChange(){
+  // Small delay so radio state updates first
+  setTimeout(()=>{
+    const mode=document.querySelector('input[name="aSlotMode"]:checked')?.value||'auto';
+    document.getElementById('fixedSlotInput').style.display=mode==='fixed'?'block':'none';
+    document.getElementById('rotateSlotInput').style.display=mode==='rotate'?'block':'none';
+    const cols={auto:'var(--bl)',fixed:'var(--gn)',rotate:'var(--yw)'};
+    ['lblAuto','lblFixed','lblRotate'].forEach(id=>document.getElementById(id).style.borderColor='var(--br)');
+    const map={auto:'lblAuto',fixed:'lblFixed',rotate:'lblRotate'};
+    if(map[mode])document.getElementById(map[mode]).style.borderColor=cols[mode]||'var(--bl)';
+    if(mode==='fixed')updateSlotCalc();
+    if(mode==='rotate')updateRotateCalc();
+  },10);
+}
+
+function updateSlotCalc(){
+  const slots=parseInt(document.getElementById('aFixedSlots').value)||0;
+  const el=document.getElementById('slotCalcResult');
+  if(!slots){el.textContent='';return;}
+  const cap=slots*2000;
+  if(_previewData?.ok){
+    const ov=Math.max(0,_previewData.total_entries-cap);
+    if(ov>0)el.innerHTML=`<span style="color:var(--r)">⚠ ${ov.toLocaleString()} overflow</span><br><span>${cap.toLocaleString()} capacity</span>`;
+    else el.innerHTML=`<span style="color:var(--gn)">✓ ${(cap-_previewData.total_entries).toLocaleString()} headroom</span><br><span>${cap.toLocaleString()} capacity</span>`;
+  }else{
+    el.innerHTML=`<span>${cap.toLocaleString()} capacity</span>`;
+  }
+}
+
+function updateRotateCalc(){
+  const slots=parseInt(document.getElementById('aRotateSlots').value)||0;
+  const el=document.getElementById('rotateCalcResult');
+  if(!slots){el.textContent='';return;}
+  const cap=slots*2000;
+  if(_previewData?.ok&&_previewData.total_entries>0){
+    const pct=Math.min(100,Math.round(cap/_previewData.total_entries*100));
+    el.innerHTML=`<span style="color:var(--yw)">~${pct}% coverage/sync</span><br><span>${cap.toLocaleString()} of ${_previewData.total_entries.toLocaleString()}</span>`;
+  }else{
+    el.innerHTML=`<span>${cap.toLocaleString()} capacity</span>`;
+  }
+}
+
+async function submitAdd(e){
+  e.preventDefault();
+  const btn=document.getElementById('addBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> Adding…';
+  const mode=document.querySelector('input[name="aSlotMode"]:checked')?.value||'auto';
+  let slots=null;
+  if(mode==='fixed')slots=parseInt(document.getElementById('aFixedSlots').value)||null;
+  if(mode==='rotate')slots=parseInt(document.getElementById('aRotateSlots').value)||null;
+  try{
+    const res=await fetch('/api/subscriptions',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:document.getElementById('aName').value.trim(),
+        source_url:document.getElementById('aUrl').value.trim(),
+        sync_interval_hours:parseInt(document.getElementById('aInterval').value),
+        list_type:document.getElementById('aType').value,
+        tags:document.getElementById('aTags').value.trim(),
+        notes:document.getElementById('aNotes').value.trim(),
+        slot_mode:mode, allocated_slots:slots,
+      })
+    });
+    const d=await res.json();
+    if(!res.ok)throw new Error(d.detail||'Failed');
+    closeAddModal();toast('Subscription added, sync queued','success');loadSubs();
+  }catch(err){toast(err.message,'error')}
+  finally{btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Add &amp; Sync'}
+}
+
+// ── Edit Modal ──────────────────────────────────────────────────────────
+function openEditModal(id){
+  const s=_subs.find(x=>x.id===id);if(!s)return;
+  document.getElementById('eId').value=id;
+  document.getElementById('eName').value=s.name||'';
+  document.getElementById('eUrl').value=s.source_url||'';
+  document.getElementById('eInterval').value=s.sync_interval_hours||24;
+  document.getElementById('eTags').value=s.tags||'';
+  document.getElementById('eNotes').value=s.notes||'';
+  document.getElementById('eSlotMode').value=s.slot_mode||'auto';
+  document.getElementById('eAllocSlots').value=s.allocated_slots||'';
+  const cb=document.getElementById('eEnabled');
+  cb.checked=!!s.enabled;
+  document.getElementById('eEnabledLbl').textContent=s.enabled?'Enabled':'Disabled';
+  cb.onchange=()=>document.getElementById('eEnabledLbl').textContent=cb.checked?'Enabled':'Disabled';
+  onEditModeChange();
+  document.getElementById('editModal').classList.add('open');
+}
+function onEditModeChange(){
+  const mode=document.getElementById('eSlotMode').value;
+  const wrap=document.getElementById('eSlotCountWrap');
+  wrap.style.opacity=mode==='auto'?'0.4':'1';
+  wrap.querySelector('input').disabled=mode==='auto';
+  const hints={
+    auto:'Lists grow and shrink dynamically. New lists may not be in your groups.',
+    fixed:'Exactly N lists, forever. Assign to groups once — content updates in place.',
+    rotate:'N lists. Content shuffles on each sync for rotating partial coverage.',
+  };
+  document.getElementById('eSlotHint').textContent=hints[mode]||'';
+}
+function closeEditModal(){document.getElementById('editModal').classList.remove('open')}
+
+async function submitEdit(e){
+  e.preventDefault();
+  const id=parseInt(document.getElementById('eId').value);
+  try{
+    const res=await fetch(`/api/subscriptions/${id}`,{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:document.getElementById('eName').value.trim(),
+        source_url:document.getElementById('eUrl').value.trim(),
+        sync_interval_hours:parseInt(document.getElementById('eInterval').value),
+        enabled:document.getElementById('eEnabled').checked,
+        tags:document.getElementById('eTags').value.trim(),
+        notes:document.getElementById('eNotes').value.trim(),
+        slot_mode:document.getElementById('eSlotMode').value,
+        allocated_slots:parseInt(document.getElementById('eAllocSlots').value)||null,
+      })
+    });
+    const d=await res.json();
+    if(!res.ok)throw new Error(d.detail||'Failed');
+    closeEditModal();toast('Subscription updated','success');loadSubs();
+  }catch(err){toast(err.message,'error')}
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────
+async function triggerSync(id,name){
+  try{
+    const res=await fetch(`/api/subscriptions/${id}/sync`,{method:'POST'});
+    if(!res.ok)throw new Error('Failed');
+    toast(`Sync queued for "${name}"`,'info');
+    setTimeout(loadSubs,1500);
+  }catch(e){toast(e.message,'error')}
+}
+
+async function deleteSub(id,name){
+  if(!confirm(`Delete "${name}"?\n\nThis removes all associated Firewalla target lists.`))return;
+  try{
+    const res=await fetch(`/api/subscriptions/${id}`,{method:'DELETE'});
+    const d=await res.json();
+    if(!res.ok)throw new Error(d.detail||'Delete failed');
+    toast(d.message,'success');loadSubs();
+  }catch(e){toast(e.message,'error')}
+}
+
+// ── Detail Modal ─────────────────────────────────────────────────────────
+async function openDetail(id,name){
+  document.getElementById('dtTitle').textContent=name;
+  document.getElementById('dtParts').innerHTML='<div class="spin" style="margin:12px 0"></div>';
+  document.getElementById('dtLogs').innerHTML='<div class="spin" style="margin:12px 0"></div>';
+  document.getElementById('detailModal').classList.add('open');
+  try{
+    const[sr,lr]=await Promise.all([fetch(`/api/subscriptions/${id}`),fetch(`/api/subscriptions/${id}/logs?limit=40`)]);
+    const sub=await sr.json();const logs=await lr.json();
+    renderDtParts(sub.parts||[]);renderDtLogs(logs);
+  }catch{document.getElementById('dtParts').innerHTML='<p style="color:var(--r)" class="text-sm">Failed to load</p>'}
+}
+function closeDetailModal(){document.getElementById('detailModal').classList.remove('open')}
+
+function renderDtParts(parts){
+  const el=document.getElementById('dtParts');
+  if(!parts.length){el.innerHTML='<p class="text-sm" style="color:var(--sb)">No Firewalla lists created yet.</p>';return}
+  el.innerHTML=`<p class="lbl mb-3">Firewalla Target Lists (${parts.length} part${parts.length>1?'s':''})</p>
+    <div style="display:flex;flex-direction:column;gap:8px">${parts.map(p=>`
+      <div style="background:var(--sf);border:1px solid var(--br);border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div><p class="text-sm mono">${esc(p.firewalla_list_name||'—')}</p>
+          <p class="text-xs" style="color:var(--sb)">ID: ${esc(p.firewalla_list_id||'pending')}</p></div>
+        <div class="text-right"><p class="text-sm mono">${(p.entry_count||0).toLocaleString()} entries</p>
+          <p class="text-xs" style="color:var(--sb)">${ago(p.last_synced_at)}</p></div>
+      </div>`).join('')}</div>`;
+}
+
+function renderDtLogs(logs){
+  const el=document.getElementById('dtLogs');
+  if(!logs.length){el.innerHTML='<p class="text-sm" style="color:var(--sb)">No sync logs yet.</p>';return}
+  const sc={success:'var(--gn)',error:'var(--r)',skipped:'var(--sb)',info:'var(--bl)'};
+  el.innerHTML=logs.map(l=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--br)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span class="text-xs mono" style="color:${sc[l.status]||'var(--sb)'}">${l.status.toUpperCase()}</span>
+        <span class="text-xs mono" style="color:var(--mt)">${fmtDate(l.created_at)}</span>
+      </div>
+      <p class="text-xs" style="color:var(--sb)">${esc(l.message||'')}</p>
+      ${l.entries_fetched?`<p class="text-xs mono" style="color:var(--mt);margin-top:2px">${l.entries_fetched} fetched · ${l.entries_pushed} pushed · ${(l.duration_seconds||0).toFixed(1)}s</p>`:''}
+    </div>`).join('');
+}
+
+// ── App Logs ─────────────────────────────────────────────────────────────
+async function loadAppLogs(){
+  const level=document.getElementById('logLevel').value;
+  try{
+    const logs=await(await fetch(`/api/logs?level=${level}&limit=200`)).json();
+    const el=document.getElementById('appLogsWrap');
+    if(!logs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--sb)"><p class="text-sm">No logs at this level</p></div>';return}
+    const lc={DEBUG:'var(--sb)',INFO:'var(--tx)',WARNING:'var(--yw)',ERROR:'var(--r)',CRITICAL:'var(--r)'};
+    el.innerHTML=logs.map(l=>`
+      <div class="log-row">
+        <span style="color:${lc[l.level]||'var(--sb)'};min-width:70px;display:inline-block">${l.level}</span>
+        <span style="color:var(--mt);min-width:160px;display:inline-block">${fmtDate(l.created_at)}</span>
+        <span style="color:var(--sb)">${esc(l.message)}</span>
+      </div>`).join('');
+  }catch{toast('Failed to load logs','error')}
+}
+async function clearLogs(){
+  if(!confirm('Clear all application logs?'))return;
+  await fetch('/api/logs',{method:'DELETE'});
+  toast('Logs cleared','success');loadAppLogs();
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────
+async function loadSettings(){
+  try{
+    const s=await(await fetch('/api/settings')).json();
+    document.getElementById('cfgDomain').value=s.firewalla_msp_domain||'';
+    document.getElementById('cfgMax').value=s.max_entries_per_list||2000;
+    document.getElementById('keyHint').textContent=s.firewalla_api_key_set
+      ?`Current key: ${s.firewalla_api_key_masked} — leave blank to keep`:'No API key set yet';
+  }catch{toast('Failed to load settings','error')}
+}
+async function saveSettings(){
+  const domain=document.getElementById('cfgDomain').value.trim();
+  const key=document.getElementById('cfgKey').value.trim();
+  const max=parseInt(document.getElementById('cfgMax').value)||2000;
+  if(!domain){toast('MSP Domain is required','error');return}
+  try{
+    const res=await fetch('/api/settings',{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({firewalla_msp_domain:domain,firewalla_api_key:key||'••••••••',max_entries_per_list:max})
+    });
+    const d=await res.json();
+    if(!res.ok)throw new Error(d.detail||'Failed');
+    showConnResult(d.connection_test);
+    toast('Settings saved','success');checkHealth();loadSettings();
+  }catch(e){toast(e.message,'error')}
+}
+async function testConnection(){
+  try{const d=await(await fetch('/api/health')).json();showConnResult(d.firewalla_api);}
+  catch{toast('Test failed','error')}
+}
+function showConnResult(fw){
+  const el=document.getElementById('connResult');
+  const ok=fw.status==='ok';
+  el.style.cssText=`display:block;padding:12px 14px;border-radius:6px;font-size:13px;
+    border:1px solid ${ok?'rgba(0,208,132,.3)':'rgba(255,59,48,.3)'};
+    background:${ok?'rgba(0,208,132,.08)':'rgba(255,59,48,.08)'};
+    color:${ok?'var(--gn)':'var(--r)'}`;
+  el.innerHTML=`<strong>${ok?'✓ Connected':'✗ Failed'}</strong> — ${esc(fw.message)}`;
+}
+function toggleKeyVis(){
+  const inp=document.getElementById('cfgKey');
+  inp.type=inp.type==='password'?'text':'password';
+}
+function copyText(el){
+  navigator.clipboard.writeText(el.textContent.trim());
+  toast('Copied to clipboard','success');
+}
+
+// ── Init ────────────────────────────────────────────────────────────────
+checkHealth();
+loadSubs();
+setInterval(checkHealth,30000);
+setInterval(()=>{if(document.getElementById('page-subs').classList.contains('active'))loadSubs();},15000);
+setInterval(()=>{if(document.getElementById('page-logs').classList.contains('active'))loadAppLogs();},10000);
+</script>
+</body>
+</html>

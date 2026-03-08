@@ -223,7 +223,7 @@ install_systemd_service() {
   cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Firewalla Feed Automator - MSP Blocklist Manager
-Documentation=https://github.com/your-org/firewalla-feed-automator
+Documentation=https://github.com/YOUR_USERNAME/firewalla-feed-automator
 After=network-online.target
 Wants=network-online.target
 

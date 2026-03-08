@@ -105,6 +105,9 @@ input:checked+.slider:before{transform:translateX(16px)}
         <span class="sdot" id="apiDot"></span>
         <span id="apiTxt">Checking…</span>
       </div>
+      <div id="versionBadge" class="px-3 py-1.5 rounded-md text-xs mono" style="background:var(--sf);border:1px solid var(--br);color:var(--sb)" title="App version">
+        v<span id="appVersion">…</span>
+      </div>
       <div class="flex gap-1 p-1 rounded-lg" style="background:var(--sf);border:1px solid var(--br)">
         <button class="nav-tab active" onclick="showPage('subs',this)">Subscriptions</button>
         <button class="nav-tab" onclick="showPage('logs',this)">App Logs</button>
@@ -957,7 +960,27 @@ function copyText(el){
   toast('Copied to clipboard','success');
 }
 
+// ── Version check ───────────────────────────────────────────────────────
+const _localVersion = "1.0.0";
+
+async function checkVersion() {
+  try {
+    const d = await (await fetch('/api/version')).json();
+    const v = d.version || '?';
+    document.getElementById('appVersion').textContent = v;
+    if (v !== _localVersion && v !== '?') {
+      // Server version differs from what this page was built with — nudge refresh
+      const badge = document.getElementById('versionBadge');
+      badge.style.borderColor = 'rgba(255,214,10,.5)';
+      badge.style.color = 'var(--yw)';
+      badge.title = `Server is v${v}, this page is v${_localVersion} — consider refreshing (Ctrl+Shift+R)`;
+      badge.innerHTML = `v${v} <span style="font-size:10px;opacity:.8">⚠ refresh?</span>`;
+    }
+  } catch { /* silent */ }
+}
+
 // ── Init ────────────────────────────────────────────────────────────────
+checkVersion();
 checkHealth();
 loadSubs();
 setInterval(checkHealth,30000);

@@ -16,6 +16,8 @@ from models import SubscriptionCreate, SubscriptionUpdate
 
 load_dotenv()
 
+APP_VERSION = "1.0.0"
+
 # ── DB log handler ─────────────────────────────────────────────────────────────
 class DBLogHandler(logging.Handler):
     def emit(self, record):
@@ -56,7 +58,7 @@ async def lifespan(app: FastAPI):
     yield
     await scheduler.stop()
 
-app = FastAPI(title="Firewalla Feed Automator", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Firewalla Feed Automator", version=APP_VERSION, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -72,8 +74,14 @@ async def dashboard(request: Request):
 async def health():
     s = await _fw().check_health()
     logger.info(f"Health check result: {s}")
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat(),
+    return {"status": "ok", "version": APP_VERSION, "timestamp": datetime.utcnow().isoformat(),
             "firewalla_api": s, "scheduler_running": scheduler.is_running if scheduler else False}
+
+# ── Version ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/version")
+async def get_version():
+    return {"version": APP_VERSION}
 
 # ── Preview ────────────────────────────────────────────────────────────────────
 

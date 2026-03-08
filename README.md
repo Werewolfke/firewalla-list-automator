@@ -49,6 +49,7 @@ The installer will:
 5. Register and start a `systemd` service on port `8080`
 
 Then open: **`http://YOUR_SERVER_IP:8080`**
+(DONT PUBLISH THIS ONLINE! KEEP THIS LOCAL!)
 
 ---
 

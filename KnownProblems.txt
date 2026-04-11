@@ -1,6 +1,11 @@
 This is a list of problems that still need to be fixed;
 
-- Notes sync to Firewalla MSP: the `notes` field is now sent in the API payload on create/update.
-  If notes still don't appear on the MSP page it means the Firewalla API uses a different field
-  name (e.g. "description"). Check the raw API response in the logs and adjust `firewalla_api.py`
+- Notes sync to Firewalla MSP: the `notes` field is sent in the API payload on
+  create/update (fixed in v1.1.0), but if notes still don't appear on the MSP
+  page it may mean the Firewalla API uses a different field name (e.g. "description").
+  Check the raw API response in the logs and adjust `firewalla_api.py`
   create_list / update_list payloads accordingly.
+
+- Password is stored in plain text in the SQLite database. This is a known
+  trade-off for a self-hosted tool — securing the machine is the user's
+  responsibility. A future version could hash the password with bcrypt.

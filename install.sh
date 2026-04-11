@@ -32,7 +32,7 @@ banner() {
   cat <<'EOF'
   ╔════════════════════════════════════════════╗
   ║   🔴 Firewalla Feed Automator Installer    ║
-  ║      MSP Blocklist Manager v1.0.0          ║
+  ║      MSP Blocklist Manager v1.2.1          ║
   ╚════════════════════════════════════════════╝
 EOF
   echo -e "${NC}"

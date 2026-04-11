@@ -4,7 +4,7 @@
 
 Subscribe to external blocklists (Pi-hole, AdGuard, EasyList format, etc.) and automatically sync them to your Firewalla MSP target lists. Handles splitting, deduplication, change detection, and full lifecycle management — all from a clean web UI.
 
-![Version](https://img.shields.io/badge/version-1.0.0-red)
+![Version](https://img.shields.io/badge/version-1.2.1-red)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -13,22 +13,24 @@ Subscribe to external blocklists (Pi-hole, AdGuard, EasyList format, etc.) and a
 ## Features
 
 - **Multi-source subscriptions** — Combine multiple blocklist URLs into one subscription; entries are deduplicated across sources
-- **Three slot modes** — Auto (dynamic), Fixed (permanent slots, safe for group assignment), or Rotating (partial coverage, shuffled each sync)
+- **Automatic list distribution** — Specify how many Firewalla lists to use; entries are shuffled and distributed evenly. If a list grows beyond capacity, a random rotating subset is used each sync — no silent drops, no phantom empty lists
 - **URL preview** — Analyse any URL before committing: see total entry count, minimum slots needed, and sample entries
 - **Smart ingestion** — Handles hosts-file format (`0.0.0.0 domain.com`), AdGuard/Pi-hole comments, inline comments, IPv4/IPv6/CIDR, auto-deduplication
 - **Change detection** — ETag / Last-Modified caching skips syncs when the source hasn't changed
 - **Auto-split** — Firewalla's 2000-entry limit is handled transparently; large lists become `Name_Part1`, `Name_Part2`, etc.
 - **Reconciliation** — Cross-checks local DB against live Firewalla lists before every sync; adopts existing lists by name to prevent duplicates
 - **Per-subscription scheduling** — Sync intervals from 1 hour to weekly, per subscription
+- **Error backoff** — After 3 consecutive sync failures a subscription is automatically paused for 6 hours; manual sync always bypasses the wait
 - **Web dashboard** — Live status, manual sync triggers, sync logs, app logs, and settings — all in-browser
-- **Version indicator** — Header badge shows the running version; prompts a page refresh if the server has been updated
+- **Password-protected** — Login page on first access; no username needed
+- **Version indicator** — Header badge shows the running version; prompts a page refresh if the server has been updated while the page was open
 
 ---
 
 ## Requirements
 
 - Debian 10/11/12 or Ubuntu 20.04/22.04/24.04 (other distros should work)
-- Python 3.9+
+- Python 3.10+
 - A Firewalla MSP account with a Personal Access Token
 
 ---
@@ -36,7 +38,7 @@ Subscribe to external blocklists (Pi-hole, AdGuard, EasyList format, etc.) and a
 ## Quick Start
 
 ```bash
-git clone git clone https://github.com/Werewolfke/firewalla-list-automator
+git clone https://github.com/Werewolfke/firewalla-list-automator
 cd firewalla-list-automator
 sudo bash install.sh
 ```
@@ -45,11 +47,14 @@ The installer will:
 1. Install Python 3, pip, and venv (if not present)
 2. Create a dedicated system user (`fwautomator`)
 3. Set up the Python virtual environment and install dependencies
-4. Prompt for your **Firewalla API key** and **MSP domain**
-5. Register and start a `systemd` service on port `8080`
+4. Ask for the port number to run on (default: `8080`)
+5. Register and start a `systemd` service
 
 Then open: **`http://YOUR_SERVER_IP:8080`**
-(DONT PUBLISH THIS ONLINE! Keep this LOCAL!)
+
+On first visit the browser will walk you through a **setup wizard** — enter your Firewalla MSP domain, API key, and a login password. No credentials are entered during install.
+
+> **Keep this LOCAL.** Do not expose the web UI to the internet without an authenticating reverse proxy in front of it.
 
 ---
 
@@ -61,7 +66,7 @@ Log in to your Firewalla MSP portal. Your URL will look like:
 ```
 https://yourid.firewalla.net
 ```
-Use only the domain part — `yourid.firewalla.net` — no `https://` prefix.
+Use only the domain part — `yourid.firewalla.net` — no `https://` prefix. The setup wizard accepts either form.
 
 **Personal Access Token (API Key)**
 
@@ -73,15 +78,16 @@ Give it read/write access to target lists.
 ## Manual / Development Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/firewalla-feed-automator
-cd firewalla-feed-automator
+git clone https://github.com/Werewolfke/firewalla-list-automator
+cd firewalla-list-automator
 
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env — set FIREWALLA_API_KEY and FIREWALLA_MSP_DOMAIN
+# Edit .env if needed (HOST, PORT, MAX_ENTRIES_PER_LIST, SECRET_KEY)
+# Firewalla credentials are entered via the web UI on first run
 
 uvicorn app:app --host 0.0.0.0 --port 8080 --reload
 ```
@@ -90,30 +96,29 @@ uvicorn app:app --host 0.0.0.0 --port 8080 --reload
 
 ## Configuration
 
-Settings are stored in the SQLite database and can be updated live from the **Settings tab** in the web UI — no restart required. They can also be pre-seeded via `.env`:
+All Firewalla credentials and most settings are stored in the SQLite database and managed through the **Settings tab** in the web UI — no restart required. The `.env` file covers only the low-level server settings:
 
 | Variable | Description | Default |
 |---|---|---|
-| `FIREWALLA_API_KEY` | Personal Access Token | *(set in UI)* |
-| `FIREWALLA_MSP_DOMAIN` | e.g. `yourid.firewalla.net` | *(set in UI)* |
+| `HOST` | Bind address | `0.0.0.0` |
 | `PORT` | Web UI port | `8080` |
 | `MAX_ENTRIES_PER_LIST` | Row limit per Firewalla list | `2000` |
+| `SECRET_KEY` | Signs the session cookie — change to invalidate all sessions | *(auto-generated by install.sh)* |
+
+Firewalla API key, MSP domain, and login password are all set via the web UI and stored in the database.
 
 ---
 
-## Slot Allocation Modes
+## How List Distribution Works
 
-Firewalla requires you to manually assign target lists to groups/LANs. The slot mode controls how lists are managed across syncs:
+When you add a subscription you choose **how many Firewalla lists** to allocate. The app always:
 
-| Mode | Behaviour | Use when |
-|---|---|---|
-| **Auto** | Lists grow and shrink dynamically | Simple setups, don't mind re-assigning groups |
-| **Fixed** | Exactly N lists, created once, never deleted | You want permanent group assignments — set N with buffer room for growth |
-| **Rotate** | N lists, full source shuffled each sync | Very large lists with limited slots — different entries blocked each cycle |
+1. Shuffles all entries randomly before each sync
+2. Distributes them evenly across the allocated lists
+3. If the source is smaller than the capacity, entries fill as many lists as needed and the rest are left empty (but kept, so group assignments stay intact)
+4. If the source grows beyond capacity, a random rotating subset is used — different entries are blocked each sync cycle, ensuring gradual coverage over time
 
-**Fixed mode example:** Source has 26,000 entries (13 slots minimum). Set 16 fixed slots for headroom. Group assignments are set once and never need updating again.
-
-**Rotate mode example:** Source has 26,000 entries but you only want 15 slots. Each sync shuffles the full list and distributes evenly (~1,733 entries/slot). Coverage rotates so different entries are blocked each cycle.
+> **Tip:** Always allocate a few extra lists as buffer. If a blocklist you subscribed to doubles in size, the rotating coverage kicks in automatically — nothing breaks, you just get partial coverage until you increase the slot count.
 
 ---
 
@@ -147,6 +152,8 @@ Firewalla requires you to manually assign target lists to groups/LANs. The slot 
 
 ## API Reference
 
+All `/api/*` endpoints except `/api/health` and `/api/version` require an authenticated session cookie.
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/version` | Running app version |
@@ -170,13 +177,13 @@ Interactive API docs: **`http://YOUR_IP:8080/docs`**
 
 ```bash
 # Status
-systemctl status firewalla-feed-automator
+systemctl status firewalla-automator
 
 # Restart (e.g. after a manual file update)
-systemctl restart firewalla-feed-automator
+sudo systemctl restart firewalla-automator
 
 # Live logs
-journalctl -u firewalla-feed-automator -f
+journalctl -u firewalla-automator -f
 
 # Uninstall
 sudo bash uninstall.sh
@@ -187,14 +194,12 @@ sudo bash uninstall.sh
 ## Updating
 
 ```bash
-cd /opt/firewalla-feed-automator
-git pull
-sudo systemctl restart firewalla-feed-automator
+cd /opt/firewalla-automator
+sudo git pull
+sudo systemctl restart firewalla-automator
 ```
 
-The version badge in the top-right of the dashboard will show a yellow **⚠ refresh?** if the page you have open is older than the running server — just hit **Ctrl+Shift+R** to hard-refresh.
-
-When releasing a new version, bump `APP_VERSION` in `app.py` and `_localVersion` in `dashboard.html` to match.
+The database is migrated automatically on startup — no manual SQL needed. The version badge in the top-right of the dashboard will show a yellow **⚠ refresh?** prompt if the server was updated while the page was open.
 
 ---
 
@@ -219,7 +224,7 @@ https://github.com/firehol/blocklist-ipsets
 
 <img width="1302" height="540" alt="image" src="https://github.com/user-attachments/assets/ed9a3434-a469-4607-943b-bf0fc3669983" />
 
-
+---
 
 ## Tech Stack
 
@@ -228,7 +233,7 @@ https://github.com/firehol/blocklist-ipsets
 | Backend | Python 3, FastAPI, uvicorn |
 | Frontend | Jinja2, Tailwind CSS (CDN), vanilla JS |
 | Database | SQLite (WAL mode) |
-| HTTP client | httpx (async) |
+| HTTP client | httpx (async, shared persistent client) |
 | Service | systemd |
 
 ---

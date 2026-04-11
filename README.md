@@ -71,7 +71,6 @@ Use only the domain part — `yourid.firewalla.net` — no `https://` prefix. Th
 **Personal Access Token (API Key)**
 
 In the MSP portal → *Profile* → *Personal Access Tokens* → *Generate new token*.
-Give it read/write access to target lists.
 
 ---
 
@@ -114,9 +113,8 @@ Firewalla API key, MSP domain, and login password are all set via the web UI and
 When you add a subscription you choose **how many Firewalla lists** to allocate. The app always:
 
 1. Shuffles all entries randomly before each sync
-2. Distributes them evenly across the allocated lists
-3. If the source is smaller than the capacity, entries fill as many lists as needed and the rest are left empty (but kept, so group assignments stay intact)
-4. If the source grows beyond capacity, a random rotating subset is used — different entries are blocked each sync cycle, ensuring gradual coverage over time
+2. Distributes them evenly across **all** allocated lists — a 500-entry list across 3 slots becomes ~167 / 167 / 166
+3. If the source grows beyond the total capacity of all allocated lists, a random rotating subset is used — different entries are blocked each sync cycle, ensuring gradual coverage over time
 
 > **Tip:** Always allocate a few extra lists as buffer. If a blocklist you subscribed to doubles in size, the rotating coverage kicks in automatically — nothing breaks, you just get partial coverage until you increase the slot count.
 

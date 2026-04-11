@@ -1,2 +1,6 @@
 This is a list of problems that still need to be fixed;
-- Notes do not go trought to the MSP page yet. Notes stay empty on the MSP page eventhough they are filled in on the WebGui.
+
+- Notes sync to Firewalla MSP: the `notes` field is now sent in the API payload on create/update.
+  If notes still don't appear on the MSP page it means the Firewalla API uses a different field
+  name (e.g. "description"). Check the raw API response in the logs and adjust `firewalla_api.py`
+  create_list / update_list payloads accordingly.

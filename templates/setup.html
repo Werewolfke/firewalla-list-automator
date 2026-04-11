@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Setup — Firewalla Feed Automator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--r:#ff3b30;--o:#ff6a00;--bg:#0a0c0f;--sf:#111318;--cd:#161a21;--br:#252b35;--mt:#3a4150;--tx:#e2e8f2;--sb:#7a8599;--gn:#00d084;--yw:#ffd60a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(255,59,48,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,59,48,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.mono{font-family:'IBM Plex Mono',monospace}
+.card{background:var(--cd);border:1px solid var(--br);border-radius:12px;position:relative;overflow:hidden;width:100%;max-width:520px;padding:40px}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--r),var(--o))}
+.inp{width:100%;background:var(--sf);border:1px solid var(--br);border-radius:6px;padding:11px 14px;color:var(--tx);font-size:14px;font-family:inherit;transition:border-color .15s;outline:none}
+.inp:focus{border-color:var(--r)}
+.inp::placeholder{color:var(--mt)}
+.lbl{display:block;font-size:12px;font-weight:500;color:var(--sb);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase}
+.hint{font-size:12px;color:var(--sb);margin-top:5px}
+.btn{width:100%;padding:12px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:inherit;background:linear-gradient(135deg,var(--r),var(--o));color:#fff;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.err{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--r)}
+.sep{border:none;border-top:1px solid var(--br);margin:28px 0}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--r),var(--o));font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+</style>
+</head>
+<body style="position:relative;z-index:1">
+<div class="card">
+  <!-- Logo -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
+    <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="8" fill="url(#lg)"/>
+      <path d="M10 12h16M10 18h10M10 24h13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="28" cy="18" r="5" fill="white" opacity=".15"/>
+      <path d="M26 18l1.5 1.5L30 16" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stop-color="#ff3b30"/><stop offset="100%" stop-color="#ff6a00"/></linearGradient></defs>
+    </svg>
+    <div>
+      <div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Firewalla Feed Automator</div>
+      <div class="mono" style="font-size:11px;color:var(--sb);margin-top:2px">First-run setup</div>
+    </div>
+  </div>
+
+  <h2 style="font-size:18px;font-weight:600;margin-bottom:6px">Welcome</h2>
+  <p style="font-size:13px;color:var(--sb);margin-bottom:28px">Configure your Firewalla MSP connection and set a login password. You can update all of these later in Settings.</p>
+
+  {% if error %}
+  <div class="err" style="margin-bottom:20px">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/setup">
+
+    <!-- Section 1: Firewalla -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px">
+      <span class="step-badge">1</span>
+      <span style="font-size:13px;font-weight:600;color:var(--tx)">Firewalla MSP Connection</span>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label class="lbl">MSP Domain</label>
+      <input class="inp" type="text" name="msp_domain" placeholder="yourid.firewalla.net" autocomplete="off" autofocus required/>
+      <p class="hint">The domain from your Firewalla portal URL — no <span class="mono" style="font-size:11px">https://</span> prefix needed.</p>
+    </div>
+
+    <div style="margin-bottom:4px">
+      <label class="lbl">API Key (Personal Access Token)</label>
+      <input class="inp" type="password" name="api_key" placeholder="Paste your token here" autocomplete="off" required/>
+      <p class="hint">Found in your Firewalla MSP portal under Account → API Tokens.</p>
+    </div>
+
+    <hr class="sep"/>
+
+    <!-- Section 2: Password -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px">
+      <span class="step-badge">2</span>
+      <span style="font-size:13px;font-weight:600;color:var(--tx)">Set Login Password</span>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label class="lbl">Password</label>
+      <input class="inp" type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required/>
+    </div>
+
+    <div style="margin-bottom:28px">
+      <label class="lbl">Confirm Password</label>
+      <input class="inp" type="password" name="confirm_password" placeholder="Repeat password" autocomplete="new-password" required/>
+    </div>
+
+    <button class="btn" type="submit">Complete Setup &amp; Sign In</button>
+  </form>
+</div>
+</body>
+</html>

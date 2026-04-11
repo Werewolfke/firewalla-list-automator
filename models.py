@@ -1,15 +1,14 @@
-from typing import Optional, Literal
+from typing import Optional
 from pydantic import BaseModel, field_validator
 
 class SubscriptionCreate(BaseModel):
     name: str
     source_url: str          # newline-separated URLs, stored as-is in DB
     sync_interval_hours: int = 24
-    list_type: Literal["domain", "ip", "mixed"] = "domain"
+    list_type: str = "domain"
     tags: Optional[str] = ""
     notes: Optional[str] = ""
-    slot_mode: Literal["auto", "fixed", "rotate"] = "auto"
-    allocated_slots: Optional[int] = None
+    allocated_slots: Optional[int] = None   # number of Firewalla lists; None = auto-calculate
 
     @field_validator("name")
     @classmethod
@@ -23,6 +22,12 @@ class SubscriptionCreate(BaseModel):
         if v not in [1, 6, 12, 24, 48, 168]: raise ValueError("Invalid interval")
         return v
 
+    @field_validator("list_type")
+    @classmethod
+    def valid_type(cls, v):
+        if v not in ("domain", "ip", "mixed"): raise ValueError("Invalid list type")
+        return v
+
 class SubscriptionUpdate(BaseModel):
     name: Optional[str] = None
     source_url: Optional[str] = None   # newline-separated URLs
@@ -30,7 +35,6 @@ class SubscriptionUpdate(BaseModel):
     enabled: Optional[bool] = None
     tags: Optional[str] = None
     notes: Optional[str] = None
-    slot_mode: Optional[Literal["auto", "fixed", "rotate"]] = None
     allocated_slots: Optional[int] = None
 
     @field_validator("sync_interval_hours")

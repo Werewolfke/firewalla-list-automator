@@ -157,47 +157,23 @@ setup_python_env() {
 
 configure_env() {
   if [[ -f "${APP_DIR}/.env" ]]; then
-    log ".env file already exists, skipping configuration prompt"
+    log ".env already exists — skipping (credentials are managed in the web UI)"
     return
   fi
 
-  log "Initial configuration setup..."
+  log "Generating .env configuration..."
   echo ""
-  echo -e "${BOLD}Enter your Firewalla MSP credentials:${NC}"
-  echo -e "${ORANGE}(You can also update these later in the web UI Settings tab)${NC}"
-  echo ""
-
-  # API Key
-  read -rp "  Firewalla API Key (Personal Access Token): " fw_api_key
-
-  # MSP Domain with clear guidance
-  echo ""
-  echo -e "  ${BOLD}MSP Domain${NC}"
-  echo -e "  Your Firewalla portal URL looks like: ${BLUE}https://yourid.firewalla.net${NC}"
-  echo -e "  Enter only the domain — ${ORANGE}no https:// prefix needed${NC}"
-  echo -e "  Example: ${GREEN}yourid.firewalla.net${NC}"
-  echo ""
-  read -rp "  MSP Domain: " fw_msp_domain
-
-  # Strip any accidental https:// or http:// prefix, and trailing slash
-  fw_msp_domain="${fw_msp_domain#https://}"
-  fw_msp_domain="${fw_msp_domain#http://}"
-  fw_msp_domain="${fw_msp_domain%/}"
-
-  # Port
-  echo ""
-  read -rp "  App Port [${APP_PORT}]: " input_port
+  read -rp "  App port [${APP_PORT}]: " input_port
   APP_PORT="${input_port:-$APP_PORT}"
 
   local secret_key
-  secret_key=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 48 | head -n 1 || echo "fallback-secret-$(date +%s)")
+  secret_key=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 48 | head -n 1 2>/dev/null \
+    || echo "fallback-secret-$(date +%s)")
 
   cat > "${APP_DIR}/.env" << ENVEOF
 # Firewalla Feed Automator Configuration
 # Generated: $(date)
-
-FIREWALLA_API_KEY=${fw_api_key}
-FIREWALLA_MSP_DOMAIN=${fw_msp_domain}
+# Firewalla API key and MSP domain are set on first visit to the web UI.
 
 HOST=0.0.0.0
 PORT=${APP_PORT}
@@ -206,7 +182,7 @@ SECRET_KEY=${secret_key}
 ENVEOF
 
   chmod 600 "${APP_DIR}/.env"
-  success ".env saved — domain: ${fw_msp_domain}"
+  success ".env generated (port: ${APP_PORT})"
 }
 
 set_permissions() {
@@ -296,8 +272,11 @@ print_summary() {
   echo -e "${GREEN}${BOLD}  ✓ Installation Complete!${NC}"
   echo -e "${GREEN}${BOLD}════════════════════════════════════════════${NC}"
   echo ""
-  echo -e "  ${BOLD}Dashboard:${NC}  http://${ip}:${port}"
-  echo -e "  ${BOLD}API Docs:${NC}   http://${ip}:${port}/docs"
+  echo -e "  ${BOLD}Open in browser:${NC}  http://${ip}:${port}"
+  echo -e "  ${BOLD}API Docs:${NC}         http://${ip}:${port}/docs"
+  echo ""
+  echo -e "  ${GREEN}On first visit you will be guided through entering your${NC}"
+  echo -e "  ${GREEN}Firewalla API key, MSP domain, and setting a login password.${NC}"
   echo ""
   echo -e "  ${BOLD}Manage service:${NC}"
   echo -e "    systemctl status  ${APP_NAME}"
@@ -306,37 +285,21 @@ print_summary() {
   echo ""
   echo -e "  ${BOLD}Config file:${NC}  ${APP_DIR}/.env"
   echo ""
-  echo -e "${ORANGE}  ⚠  Update credentials anytime in the web UI → Settings tab${NC}"
+  echo -e "${ORANGE}  ⚠  Keep this app on your local network — it has no HTTPS built in.${NC}"
   echo ""
-}
-
-# ── Uninstall ─────────────────────────────────────────────────────────────────
-uninstall() {
-  log "Uninstalling ${APP_NAME}..."
-  systemctl stop "$APP_NAME" 2>/dev/null || true
-  systemctl disable "$APP_NAME" 2>/dev/null || true
-  rm -f "$SERVICE_FILE"
-  systemctl daemon-reload
-  
-  read -rp "Delete application data in ${APP_DIR}? [y/N] " confirm
-  if [[ "$confirm" =~ ^[Yy]$ ]]; then
-    rm -rf "$APP_DIR"
-    userdel "$APP_USER" 2>/dev/null || true
-    success "Fully uninstalled"
-  else
-    success "Service removed. Data kept at ${APP_DIR}"
-  fi
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 main() {
   banner
 
-  # Handle uninstall flag
+  # Delegate --uninstall to the dedicated uninstall.sh so logic lives in one place
   if [[ "${1:-}" == "--uninstall" ]]; then
-    check_root
-    uninstall
-    exit 0
+    if [[ -f "${SCRIPT_DIR}/uninstall.sh" ]]; then
+      exec bash "${SCRIPT_DIR}/uninstall.sh"
+    else
+      error "uninstall.sh not found in ${SCRIPT_DIR}"
+    fi
   fi
 
   check_root

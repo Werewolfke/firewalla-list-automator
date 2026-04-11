@@ -2,6 +2,10 @@ import sqlite3, logging
 from contextlib import contextmanager
 from pathlib import Path
 
+# Run the expensive log-trim only every N inserts to avoid a DELETE on every log line.
+_log_write_counter = 0
+_LOG_TRIM_EVERY = 50
+
 logger = logging.getLogger(__name__)
 DB_PATH = Path("data/firewalla_automator.db")
 
@@ -66,7 +70,7 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_app_logs_level ON app_logs(level);
             CREATE INDEX IF NOT EXISTS idx_app_logs_created ON app_logs(created_at);
         """)
-        # Live-migrate existing DBs
+        # Live-migrate existing DBs — add columns if not yet present
         for col, defn in [
             ("slot_mode",       "TEXT NOT NULL DEFAULT 'auto'"),
             ("allocated_slots", "INTEGER"),
@@ -76,6 +80,22 @@ def init_db():
                 logger.info(f"DB migrated: added subscriptions.{col}")
             except Exception:
                 pass
+
+        # Migrate old slot modes (auto/fixed) to the single rotate behaviour.
+        # For old auto rows with no allocated_slots, use their current part count
+        # so the list count stays stable across the update.
+        conn.execute("""
+            UPDATE subscriptions
+            SET slot_mode = 'rotate',
+                allocated_slots = COALESCE(
+                    allocated_slots,
+                    (SELECT COUNT(*) FROM subscription_parts
+                     WHERE subscription_id = subscriptions.id),
+                    1
+                )
+            WHERE slot_mode IN ('auto', 'fixed')
+               OR allocated_slots IS NULL
+        """)
         conn.commit()
     logger.info(f"Database initialised at {DB_PATH}")
 

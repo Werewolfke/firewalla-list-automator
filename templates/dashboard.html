@@ -113,6 +113,10 @@ input:checked+.slider:before{transform:translateX(16px)}
         <button class="nav-tab" onclick="showPage('logs',this)">App Logs</button>
         <button class="nav-tab" onclick="showPage('settings',this)">Settings</button>
       </div>
+      <a href="/logout" class="btn btn-g" style="padding:7px 14px;font-size:12px;text-decoration:none" title="Sign out">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Sign out
+      </a>
     </div>
   </div>
 </header>
@@ -250,6 +254,27 @@ input:checked+.slider:before{transform:translateX(16px)}
       </div>
     </div>
   </div>
+
+  <!-- Password change card -->
+  <div class="card p-6 mt-6" style="max-width:480px">
+    <h3 class="text-sm font-semibold mb-1">Change Login Password</h3>
+    <p class="text-xs mb-5" style="color:var(--sb)">Leave new password blank to keep the current one.</p>
+    <div class="mb-4">
+      <label class="lbl">Current Password</label>
+      <input id="pwCurrent" type="password" class="inp" placeholder="Current password"/>
+    </div>
+    <div class="mb-4">
+      <label class="lbl">New Password</label>
+      <input id="pwNew" type="password" class="inp" placeholder="At least 8 characters"/>
+    </div>
+    <div class="mb-5">
+      <label class="lbl">Confirm New Password</label>
+      <input id="pwConfirm" type="password" class="inp" placeholder="Repeat new password"/>
+    </div>
+    <button class="btn btn-p" style="width:auto;padding:8px 20px" onclick="changePassword()">Update Password</button>
+    <div id="pwResult" class="mt-4 hidden"></div>
+  </div>
+
 </div><!-- /page-settings -->
 
 </main><!-- /main -->
@@ -305,58 +330,25 @@ input:checked+.slider:before{transform:translateX(16px)}
         </div>
       </div>
 
-      <!-- Slot Allocation (always visible, not hidden behind analyse) -->
-      <div style="border:1px solid var(--br);border-radius:8px;overflow:hidden;margin-bottom:16px">
-        <div class="px-4 py-3" style="background:rgba(10,132,255,.06);border-bottom:1px solid var(--br)">
-          <p class="text-xs font-semibold" style="color:var(--bl);letter-spacing:.05em;text-transform:uppercase">Slot Allocation Strategy</p>
-          <p class="text-xs mt-0.5" style="color:var(--sb)">Controls how many Firewalla target lists are used. Run Analyse first for smart suggestions.</p>
+      <!-- Number of lists -->
+      <div style="border:1px solid rgba(255,214,10,.3);border-radius:8px;padding:16px;margin-bottom:16px;background:rgba(255,214,10,.04)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;color:var(--yw)"><path d="M8 1l1.8 3.6L14 5.3l-3 2.9.7 4.1L8 10.4l-3.7 1.9.7-4.1L2 5.3l4.2-.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          <p class="text-xs font-semibold" style="color:var(--yw)">Blocklists can and do grow over time</p>
         </div>
-        <div class="p-4" style="display:flex;flex-direction:column;gap:10px">
-
-          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblAuto">
-            <input type="radio" name="aSlotMode" value="auto" id="modeAuto" checked style="margin-top:3px;accent-color:var(--bl)"/>
-            <div>
-              <p class="text-sm font-medium">Auto <span class="bdg bgr" style="font-size:10px;margin-left:4px">dynamic</span></p>
-              <p class="text-xs" style="color:var(--sb)">Lists grow &amp; shrink with the source. New lists won't automatically be in your groups.</p>
-            </div>
-          </label>
-
-          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblFixed">
-            <input type="radio" name="aSlotMode" value="fixed" id="modeFixed" style="margin-top:3px;accent-color:var(--gn)"/>
-            <div style="flex:1">
-              <p class="text-sm font-medium">Fixed slots <span class="bdg bg" style="font-size:10px;margin-left:4px">recommended</span></p>
-              <p class="text-xs" style="color:var(--sb)">Exactly N lists, created once, never deleted. Assign to groups once — content updates in place.</p>
-              <div id="fixedSlotInput" style="display:none;margin-top:10px">
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                  <div>
-                    <p class="lbl" style="margin-bottom:4px">Number of slots</p>
-                    <input id="aFixedSlots" type="number" class="inp" style="width:110px" min="1" max="500" placeholder="e.g. 25" oninput="updateSlotCalc()"/>
-                  </div>
-                  <div id="slotCalcResult" style="font-size:12px;color:var(--sb);font-family:'IBM Plex Mono',monospace"></div>
-                </div>
-                <div id="slotSuggestions" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-              </div>
-            </div>
-          </label>
-
-          <label onclick="onModeChange()" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px;border-radius:6px;border:1px solid var(--br)" id="lblRotate">
-            <input type="radio" name="aSlotMode" value="rotate" id="modeRotate" style="margin-top:3px;accent-color:var(--yw)"/>
-            <div style="flex:1">
-              <p class="text-sm font-medium">Rotating coverage <span class="bdg by" style="font-size:10px;margin-left:4px">partial</span></p>
-              <p class="text-xs" style="color:var(--sb)">Fewer slots than needed. Full list is shuffled each sync; different entries blocked each cycle.</p>
-              <div id="rotateSlotInput" style="display:none;margin-top:10px">
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                  <div>
-                    <p class="lbl" style="margin-bottom:4px">Number of slots</p>
-                    <input id="aRotateSlots" type="number" class="inp" style="width:110px" min="1" max="500" placeholder="e.g. 5" oninput="updateRotateCalc()"/>
-                  </div>
-                  <div id="rotateCalcResult" style="font-size:12px;color:var(--sb);font-family:'IBM Plex Mono',monospace"></div>
-                </div>
-              </div>
-            </div>
-          </label>
-
+        <p class="text-xs" style="color:var(--sb);margin-bottom:14px;line-height:1.6">
+          Set <strong style="color:var(--tx)">more lists than you currently need</strong> so the subscription stays fully covered if the source expands.
+          Each Firewalla list holds up to 2,000 entries. Entries are distributed evenly and shuffled on every sync.
+          If the list ever overflows your capacity, different random entries are covered each sync cycle.
+        </p>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div>
+            <label class="lbl" style="margin-bottom:4px">Number of Firewalla lists</label>
+            <input id="aAllocSlots" type="number" class="inp" style="width:110px" min="1" max="500" value="1" oninput="updateSlotCalc()"/>
+          </div>
+          <div id="slotCalcResult" style="font-size:12px;color:var(--sb);font-family:'IBM Plex Mono',monospace;line-height:1.6"></div>
         </div>
+        <div id="slotSuggestions" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
       </div>
 
       <div class="mb-4">
@@ -413,23 +405,13 @@ input:checked+.slider:before{transform:translateX(16px)}
           </div>
         </div>
       </div>
-      <div style="border:1px solid var(--br);border-radius:8px;padding:14px;margin-bottom:16px">
-        <p class="lbl mb-3">Slot Allocation</p>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="lbl">Mode</label>
-            <select id="eSlotMode" class="inp" onchange="onEditModeChange()">
-              <option value="auto">Auto (dynamic)</option>
-              <option value="fixed">Fixed slots</option>
-              <option value="rotate">Rotating coverage</option>
-            </select>
-          </div>
-          <div id="eSlotCountWrap">
-            <label class="lbl">Allocated Slots</label>
-            <input id="eAllocSlots" type="number" class="inp" min="1" max="500" placeholder="e.g. 25"/>
-          </div>
+      <div style="border:1px solid rgba(255,214,10,.3);border-radius:8px;padding:14px;margin-bottom:16px;background:rgba(255,214,10,.04)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;color:var(--yw)"><path d="M8 1l1.8 3.6L14 5.3l-3 2.9.7 4.1L8 10.4l-3.7 1.9.7-4.1L2 5.3l4.2-.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          <p class="lbl" style="margin:0">Number of Firewalla lists</p>
         </div>
-        <p id="eSlotHint" class="text-xs mt-2" style="color:var(--sb)"></p>
+        <p class="text-xs mb-3" style="color:var(--sb);line-height:1.6">Entries are distributed evenly and shuffled on every sync. If the source grows beyond capacity, different random entries are covered each cycle.</p>
+        <input id="eAllocSlots" type="number" class="inp" min="1" max="500" placeholder="e.g. 2" style="width:110px"/>
       </div>
       <div class="mb-4">
         <label class="lbl">Tags</label>
@@ -535,10 +517,8 @@ function fmtDate(iso){
   return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 function slotBadge(mode,slots){
-  if(!mode||mode==='auto')return'<span class="bdg bgr">auto</span>';
-  if(mode==='fixed')return`<span class="bdg bg">${slots||'?'} fixed</span>`;
-  if(mode==='rotate')return`<span class="bdg by">${slots||'?'} rotate</span>`;
-  return`<span class="bdg bgr">${esc(mode)}</span>`;
+  const n=slots||'?';
+  return`<span class="bdg bgr">${n} list${n!==1?'s':''}</span>`;
 }
 function sbadge(status){
   const m={ok:['bg','● synced'],error:['br2','✗ error'],syncing:['bb','⟳ syncing'],
@@ -578,7 +558,8 @@ function renderSubs(subs){
 function subRow(s){
   const tags=(s.tags||'').split(',').filter(Boolean);
   const urlCount=(s.source_url||'').split(/[\n\r,]+/).filter(u=>u.trim().startsWith('http')).length;
-  return`<tr style="border-bottom:1px solid var(--br);transition:background .1s"
+  const dimmed=!s.enabled?"opacity:.45;":"";
+  return`<tr style="border-bottom:1px solid var(--br);transition:background .1s;${dimmed}"
     onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
     <td class="px-6 py-4">
       <div class="flex items-center gap-3">
@@ -670,12 +651,11 @@ async function runPreview(){
         </div>
         ${d.sample?.length?`<p style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--sb)">${d.sample.join(', ')}…</p>`:''}
         ${urlDetail}`;
-      // Pre-fill suggestions
+      // Pre-fill list count with min+1 buffer, show quick-select suggestions
       const min=d.min_slots_needed;
-      document.getElementById('aFixedSlots').value=min+Math.ceil(min*.2);
-      document.getElementById('aRotateSlots').value=Math.max(1,Math.floor(min/2));
+      document.getElementById('aAllocSlots').value=min+1;
       buildSuggestions(min);
-      updateSlotCalc(); updateRotateCalc();
+      updateSlotCalc();
     }else{
       box.style.borderColor='rgba(255,59,48,.3)';box.style.background='rgba(255,59,48,.06)';
       box.innerHTML=`<p style="color:var(--r)">✗ ${esc(d.error)}</p>`;
@@ -693,55 +673,31 @@ function buildSuggestions(min){
   const el=document.getElementById('slotSuggestions');
   const opts=[
     {label:`Min (${min})`,v:min},
-    {label:`+20% (${min+Math.ceil(min*.2)})`,v:min+Math.ceil(min*.2)},
+    {label:`+1 buffer (${min+1})`,v:min+1},
     {label:`+50% (${min+Math.ceil(min*.5)})`,v:min+Math.ceil(min*.5)},
     {label:`2× (${min*2})`,v:min*2},
   ];
   el.innerHTML=opts.map(o=>
     `<button type="button" class="btn btn-g" style="font-size:11px;padding:4px 10px;font-family:'IBM Plex Mono',monospace"
-      onclick="document.getElementById('aFixedSlots').value=${o.v};updateSlotCalc()">${o.label}</button>`
+      onclick="document.getElementById('aAllocSlots').value=${o.v};updateSlotCalc()">${o.label}</button>`
   ).join('');
 }
 
-function onModeChange(){
-  // Small delay so radio state updates first
-  setTimeout(()=>{
-    const mode=document.querySelector('input[name="aSlotMode"]:checked')?.value||'auto';
-    document.getElementById('fixedSlotInput').style.display=mode==='fixed'?'block':'none';
-    document.getElementById('rotateSlotInput').style.display=mode==='rotate'?'block':'none';
-    const cols={auto:'var(--bl)',fixed:'var(--gn)',rotate:'var(--yw)'};
-    ['lblAuto','lblFixed','lblRotate'].forEach(id=>document.getElementById(id).style.borderColor='var(--br)');
-    const map={auto:'lblAuto',fixed:'lblFixed',rotate:'lblRotate'};
-    if(map[mode])document.getElementById(map[mode]).style.borderColor=cols[mode]||'var(--bl)';
-    if(mode==='fixed')updateSlotCalc();
-    if(mode==='rotate')updateRotateCalc();
-  },10);
-}
-
 function updateSlotCalc(){
-  const slots=parseInt(document.getElementById('aFixedSlots').value)||0;
+  const slots=parseInt(document.getElementById('aAllocSlots').value)||0;
   const el=document.getElementById('slotCalcResult');
   if(!slots){el.textContent='';return;}
   const cap=slots*2000;
   if(_previewData?.ok){
     const ov=Math.max(0,_previewData.total_entries-cap);
-    if(ov>0)el.innerHTML=`<span style="color:var(--r)">⚠ ${ov.toLocaleString()} overflow</span><br><span>${cap.toLocaleString()} capacity</span>`;
-    else el.innerHTML=`<span style="color:var(--gn)">✓ ${(cap-_previewData.total_entries).toLocaleString()} headroom</span><br><span>${cap.toLocaleString()} capacity</span>`;
+    if(ov>0){
+      const pct=Math.round(cap/_previewData.total_entries*100);
+      el.innerHTML=`<span style="color:var(--yw)">⚠ overflow — ~${pct}% coverage/sync</span><br><span style="color:var(--sb)">${cap.toLocaleString()} of ${_previewData.total_entries.toLocaleString()} entries</span>`;
+    }else{
+      el.innerHTML=`<span style="color:var(--gn)">✓ ${(cap-_previewData.total_entries).toLocaleString()} headroom</span><br><span style="color:var(--sb)">${_previewData.total_entries.toLocaleString()} of ${cap.toLocaleString()} capacity used</span>`;
+    }
   }else{
-    el.innerHTML=`<span>${cap.toLocaleString()} capacity</span>`;
-  }
-}
-
-function updateRotateCalc(){
-  const slots=parseInt(document.getElementById('aRotateSlots').value)||0;
-  const el=document.getElementById('rotateCalcResult');
-  if(!slots){el.textContent='';return;}
-  const cap=slots*2000;
-  if(_previewData?.ok&&_previewData.total_entries>0){
-    const pct=Math.min(100,Math.round(cap/_previewData.total_entries*100));
-    el.innerHTML=`<span style="color:var(--yw)">~${pct}% coverage/sync</span><br><span>${cap.toLocaleString()} of ${_previewData.total_entries.toLocaleString()}</span>`;
-  }else{
-    el.innerHTML=`<span>${cap.toLocaleString()} capacity</span>`;
+    el.innerHTML=`<span style="color:var(--sb)">${cap.toLocaleString()} max capacity</span>`;
   }
 }
 
@@ -749,10 +705,7 @@ async function submitAdd(e){
   e.preventDefault();
   const btn=document.getElementById('addBtn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span> Adding…';
-  const mode=document.querySelector('input[name="aSlotMode"]:checked')?.value||'auto';
-  let slots=null;
-  if(mode==='fixed')slots=parseInt(document.getElementById('aFixedSlots').value)||null;
-  if(mode==='rotate')slots=parseInt(document.getElementById('aRotateSlots').value)||null;
+  const slots=parseInt(document.getElementById('aAllocSlots').value)||1;
   try{
     const res=await fetch('/api/subscriptions',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -763,7 +716,7 @@ async function submitAdd(e){
         list_type:document.getElementById('aType').value,
         tags:document.getElementById('aTags').value.trim(),
         notes:document.getElementById('aNotes').value.trim(),
-        slot_mode:mode, allocated_slots:slots,
+        allocated_slots:slots,
       })
     });
     const d=await res.json();
@@ -782,27 +735,14 @@ function openEditModal(id){
   document.getElementById('eInterval').value=s.sync_interval_hours||24;
   document.getElementById('eTags').value=s.tags||'';
   document.getElementById('eNotes').value=s.notes||'';
-  document.getElementById('eSlotMode').value=s.slot_mode||'auto';
-  document.getElementById('eAllocSlots').value=s.allocated_slots||'';
+  document.getElementById('eAllocSlots').value=s.allocated_slots||1;
   const cb=document.getElementById('eEnabled');
   cb.checked=!!s.enabled;
   document.getElementById('eEnabledLbl').textContent=s.enabled?'Enabled':'Disabled';
   cb.onchange=()=>document.getElementById('eEnabledLbl').textContent=cb.checked?'Enabled':'Disabled';
-  onEditModeChange();
   document.getElementById('editModal').classList.add('open');
 }
-function onEditModeChange(){
-  const mode=document.getElementById('eSlotMode').value;
-  const wrap=document.getElementById('eSlotCountWrap');
-  wrap.style.opacity=mode==='auto'?'0.4':'1';
-  wrap.querySelector('input').disabled=mode==='auto';
-  const hints={
-    auto:'Lists grow and shrink dynamically. New lists may not be in your groups.',
-    fixed:'Exactly N lists, forever. Assign to groups once — content updates in place.',
-    rotate:'N lists. Content shuffles on each sync for rotating partial coverage.',
-  };
-  document.getElementById('eSlotHint').textContent=hints[mode]||'';
-}
+
 function closeEditModal(){document.getElementById('editModal').classList.remove('open')}
 
 async function submitEdit(e){
@@ -818,8 +758,7 @@ async function submitEdit(e){
         enabled:document.getElementById('eEnabled').checked,
         tags:document.getElementById('eTags').value.trim(),
         notes:document.getElementById('eNotes').value.trim(),
-        slot_mode:document.getElementById('eSlotMode').value,
-        allocated_slots:parseInt(document.getElementById('eAllocSlots').value)||null,
+        allocated_slots:parseInt(document.getElementById('eAllocSlots').value)||1,
       })
     });
     const d=await res.json();
@@ -922,6 +861,27 @@ async function loadSettings(){
       ?`Current key: ${s.firewalla_api_key_masked} — leave blank to keep`:'No API key set yet';
   }catch{toast('Failed to load settings','error')}
 }
+async function changePassword(){
+  const cur=document.getElementById('pwCurrent').value;
+  const nw=document.getElementById('pwNew').value;
+  const cf=document.getElementById('pwConfirm').value;
+  const res=document.getElementById('pwResult');
+  if(!cur||!nw||!cf){res.className='mt-4 text-xs p-3 rounded';res.style.cssText='background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:var(--r)';res.textContent='All three fields are required.';res.classList.remove('hidden');return;}
+  if(nw!==cf){res.className='mt-4 text-xs p-3 rounded';res.style.cssText='background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:var(--r)';res.textContent='New passwords do not match.';res.classList.remove('hidden');return;}
+  if(nw.length<8){res.className='mt-4 text-xs p-3 rounded';res.style.cssText='background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:var(--r)';res.textContent='Password must be at least 8 characters.';res.classList.remove('hidden');return;}
+  try{
+    const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({firewalla_msp_domain:'',firewalla_api_key:'••••••••',current_password:cur,new_password:nw})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'Failed');
+    res.style.cssText='background:rgba(0,208,132,.1);border:1px solid rgba(0,208,132,.3);color:var(--gn)';
+    res.textContent='Password updated. You will need the new password on next login.';
+    res.classList.remove('hidden');
+    document.getElementById('pwCurrent').value='';
+    document.getElementById('pwNew').value='';
+    document.getElementById('pwConfirm').value='';
+  }catch(e){res.style.cssText='background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:var(--r)';res.textContent=e.message;res.classList.remove('hidden');}
+}
 async function saveSettings(){
   const domain=document.getElementById('cfgDomain').value.trim();
   const key=document.getElementById('cfgKey').value.trim();
@@ -960,20 +920,36 @@ function copyText(el){
   toast('Copied to clipboard','success');
 }
 
+// ── 401 interceptor — redirect to login if session expires ──────────────
+{
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = async function(url, opts) {
+    const r = await _origFetch(url, opts);
+    if (r.status === 401 && typeof url === 'string' && url.startsWith('/api/')) {
+      window.location.href = '/login';
+      throw new Error('Session expired — redirecting to login');
+    }
+    return r;
+  };
+}
+
 // ── Version check ───────────────────────────────────────────────────────
-const _localVersion = "1.0.0";
+// Stores the version seen on first load; subsequent interval checks detect
+// if the server was updated while the page was open and nudge a refresh.
+let _loadedVersion = null;
 
 async function checkVersion() {
   try {
     const d = await (await fetch('/api/version')).json();
     const v = d.version || '?';
     document.getElementById('appVersion').textContent = v;
-    if (v !== _localVersion && v !== '?') {
-      // Server version differs from what this page was built with — nudge refresh
+    if (_loadedVersion === null) {
+      _loadedVersion = v;
+    } else if (v !== _loadedVersion && v !== '?') {
       const badge = document.getElementById('versionBadge');
       badge.style.borderColor = 'rgba(255,214,10,.5)';
       badge.style.color = 'var(--yw)';
-      badge.title = `Server is v${v}, this page is v${_localVersion} — consider refreshing (Ctrl+Shift+R)`;
+      badge.title = `Server updated to v${v} — refresh to get latest UI (Ctrl+Shift+R)`;
       badge.innerHTML = `v${v} <span style="font-size:10px;opacity:.8">⚠ refresh?</span>`;
     }
   } catch { /* silent */ }
@@ -984,6 +960,7 @@ checkVersion();
 checkHealth();
 loadSubs();
 setInterval(checkHealth,30000);
+setInterval(checkVersion,300000);
 setInterval(()=>{if(document.getElementById('page-subs').classList.contains('active'))loadSubs();},15000);
 setInterval(()=>{if(document.getElementById('page-logs').classList.contains('active'))loadAppLogs();},10000);
 </script>

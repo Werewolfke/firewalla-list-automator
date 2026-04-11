@@ -15,7 +15,24 @@ logger = logging.getLogger(__name__)
 
 DOMAIN_RE = re.compile(r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
 IP_V4_RE  = re.compile(r'^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?:/\d{1,2})?$')
-IP_V6_RE  = re.compile(r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$')
+IP_V6_RE  = re.compile(
+    r'^('
+    r'([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|'           # 1:2:3:4:5:6:7:8
+    r'([0-9a-fA-F]{1,4}:){1,7}:|'                          # 1::  through  1:2:3:4:5:6:7::
+    r'([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|'         # 1::8  through  1:2:3:4:5:6::8
+    r'([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|'  # 1::7:8  through  1:2:3:4:5::7:8
+    r'([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|'
+    r'([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|'
+    r'([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|'
+    r'[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|'
+    r':((:[0-9a-fA-F]{1,4}){1,7}|:)|'                      # ::1  through  ::
+    r'fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|'         # link-local
+    r'::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}'
+    r'(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|'                   # ::ffff:0:255.255.255.255
+    r'([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}'
+    r'(25[0-5]|(2[0-4]|1?[0-9])?[0-9])'                    # 2001:db8::255.255.255.255
+    r')$'
+)
 
 def _valid(e):
     return bool(DOMAIN_RE.match(e) or IP_V4_RE.match(e) or IP_V6_RE.match(e))
@@ -62,11 +79,17 @@ async def fetch_one(url: str) -> tuple:
         return url, None, str(e)
 
 async def preview_urls(source_url: str, max_entries: int = 2000) -> dict:
-    """Fetch all URLs, combine, dedupe, return analysis."""
+    """Fetch all URLs, combine, dedupe, return analysis. Capped at 90s total."""
     urls = parse_urls(source_url)
     if not urls:
         return {"ok": False, "error": "No valid URLs found"}
-    results = await asyncio.gather(*[fetch_one(u) for u in urls])
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*[fetch_one(u) for u in urls]),
+            timeout=90.0,
+        )
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": "Preview timed out after 90s — URLs may be too slow or unreachable"}
     all_entries = set()
     errors = []
     url_stats = []
@@ -181,10 +204,9 @@ class ListManager:
             sub = conn.execute("SELECT * FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
             if not sub: logger.error(f"Sub {sub_id} not found"); return
         sub = dict(sub)
-        slot_mode = sub.get("slot_mode") or "auto"
-        alloc     = sub.get("allocated_slots")
-        urls      = parse_urls(sub["source_url"])
-        logger.info(f"━━ Sync: '{sub['name']}' | {len(urls)} URL(s) | mode={slot_mode} slots={alloc} ━━")
+        alloc = sub.get("allocated_slots")
+        urls  = parse_urls(sub["source_url"])
+        logger.info(f"━━ Sync: '{sub['name']}' | {len(urls)} URL(s) | lists={alloc} ━━")
         self._update_status(sub_id, "syncing", None)
         try:
             content, new_etag, new_lm, changed = await self.fetch_all_urls(
@@ -196,56 +218,43 @@ class ListManager:
                 ).fetchall()]
             if not changed and existing:
                 logger.info(f"No changes for '{sub['name']}' — skipping")
-                self._update_status(sub_id,"ok",None)
-                self._log_sync(sub_id,"skipped","No changes (ETag match)",0,0,0,0,time.time()-start)
+                self._update_status(sub_id, "ok", None)
+                self._log_sync(sub_id, "skipped", "No changes (ETag match)", 0, 0, 0, 0, time.time()-start)
                 return
 
             # Clean + dedupe across all URLs
             all_entries = clean_list(content or "", sub["list_type"])
             total = len(all_entries)
             min_slots = max(1, -(-total // self.max_entries))
-            logger.info(f"Cleaned: {total} unique entries (from {len(urls)} URL(s)), min {min_slots} slots")
 
-            # Determine chunks by mode
+            # Target number of lists: user-specified or auto-calculated minimum
+            target = alloc if alloc and alloc >= 1 else min_slots
+            logger.info(f"Cleaned: {total} unique entries — using {target} list(s) "
+                        f"(min needed: {min_slots})")
+
+            # Always shuffle before distributing
+            shuffled = list(all_entries)
+            random.shuffle(shuffled)
+
             coverage_pct = 100
-            if slot_mode == "auto":
-                chunks = chunk_list(all_entries, self.max_entries) if all_entries else [[]]
-                target = len(chunks)
-            elif slot_mode == "fixed":
-                target = alloc or min_slots
-                capacity = target * self.max_entries
-                if total > capacity:
-                    logger.warning(f"FIXED overflow: {total} > {capacity} capacity, {total-capacity} entries dropped")
-                raw = chunk_list(all_entries[:capacity], self.max_entries)
-                chunks = raw + [[] for _ in range(target - len(raw))]
-            elif slot_mode == "rotate":
-                target = alloc or min_slots
-                shuffled = list(all_entries)
-                random.shuffle(shuffled)
-
-                if total <= target * self.max_entries:
-                    # List fits — distribute evenly across all slots so each slot
-                    # gets ~equal entries (no empty slots, no max-size padding).
-                    # e.g. 26k entries / 15 slots = 1733 each
-                    per_slot = max(1, -(-total // target))  # ceiling division
-                    chunks = chunk_list(shuffled, per_slot)
-                    # chunk_list may produce slightly fewer chunks than target if
-                    # entries divide cleanly — pad only up to target
-                    chunks = chunks + [[] for _ in range(max(0, target - len(chunks)))]
-                    coverage_pct = 100
-                    logger.info(f"ROTATE (even): {total} entries across {len(chunks)} slots "
-                                f"(~{per_slot} each)")
-                else:
-                    # List overflows slots — cap at max_entries per slot, rotate coverage
-                    capacity = target * self.max_entries
-                    selected = shuffled[:capacity]
-                    chunks = chunk_list(selected, self.max_entries)
-                    chunks = chunks + [[] for _ in range(max(0, target - len(chunks)))]
-                    coverage_pct = round(capacity / total * 100, 1)
-                    logger.info(f"ROTATE (capped): {capacity}/{total} entries ({coverage_pct}% coverage)")
+            if total <= target * self.max_entries:
+                # All entries fit — distribute evenly so each list is roughly equal size
+                per_slot = max(1, -(-total // target))  # ceiling division
+                chunks = chunk_list(shuffled, per_slot)
+                chunks = chunks + [[] for _ in range(max(0, target - len(chunks)))]
+                logger.info(f"Distributing evenly: ~{per_slot} entries per list")
             else:
-                chunks = chunk_list(all_entries, self.max_entries) if all_entries else [[]]
-                target = len(chunks)
+                # List overflows the allocated capacity — randomly select what fits
+                # and rotate coverage on every sync
+                capacity = target * self.max_entries
+                selected = shuffled[:capacity]
+                chunks = chunk_list(selected, self.max_entries)
+                chunks = chunks + [[] for _ in range(max(0, target - len(chunks)))]
+                coverage_pct = round(capacity / total * 100, 1)
+                logger.warning(
+                    f"Overflow: {total} entries > {capacity} capacity "
+                    f"({coverage_pct}% covered per sync — consider adding more lists)"
+                )
 
             confirmed = await self.reconcile_parts(sub_id, sub["name"], target)
             created = patched = 0
@@ -262,33 +271,33 @@ class ListManager:
                     logger.info(f"Slot {pnum}: empty and not yet created — skipping")
                     continue
 
+                notes = sub.get("notes") or ""
                 if pnum in confirmed:
                     fw_id = confirmed[pnum]
-                    ok = await self.fw_api.update_list(fw_id, pname, chunk, sub["list_type"])
+                    ok = await self.fw_api.update_list(fw_id, pname, chunk, sub["list_type"], notes=notes)
                     if not ok: raise RuntimeError(f"PATCH failed slot {pnum} ({fw_id})")
                     self._upsert_part(sub_id, pnum, fw_id, pname, len(chunk))
                     pushed += len(chunk); patched += 1
                 else:
-                    fw_id = await self.fw_api.create_list(pname, chunk, sub["list_type"])
+                    fw_id = await self.fw_api.create_list(pname, chunk, sub["list_type"], notes=notes)
                     if not fw_id: raise RuntimeError(f"CREATE failed slot {pnum}")
                     self._upsert_part(sub_id, pnum, fw_id, pname, len(chunk))
                     pushed += len(chunk); created += 1
 
-            # Delete orphans (auto mode only)
+            # Delete orphans (lists beyond current target count)
             deleted = 0
-            if slot_mode == "auto":
-                with get_db_connection() as conn:
-                    all_parts = [dict(p) for p in conn.execute(
-                        "SELECT * FROM subscription_parts WHERE subscription_id=?", (sub_id,)
-                    ).fetchall()]
-                for p in all_parts:
-                    if p["part_number"] > target:
-                        if p.get("firewalla_list_id"):
-                            ok = await self.fw_api.delete_list(p["firewalla_list_id"])
-                            if ok: deleted += 1
-                        with get_db_connection() as conn:
-                            conn.execute("DELETE FROM subscription_parts WHERE id=?", (p["id"],))
-                            conn.commit()
+            with get_db_connection() as conn:
+                all_parts = [dict(p) for p in conn.execute(
+                    "SELECT * FROM subscription_parts WHERE subscription_id=?", (sub_id,)
+                ).fetchall()]
+            for p in all_parts:
+                if p["part_number"] > target:
+                    if p.get("firewalla_list_id"):
+                        ok = await self.fw_api.delete_list(p["firewalla_list_id"])
+                        if ok: deleted += 1
+                    with get_db_connection() as conn:
+                        conn.execute("DELETE FROM subscription_parts WHERE id=?", (p["id"],))
+                        conn.commit()
 
             with get_db_connection() as conn:
                 conn.execute("""UPDATE subscriptions SET sync_status='ok',error_message=NULL,
@@ -297,12 +306,11 @@ class ListManager:
                 conn.commit()
 
             dur = time.time()-start
-            src_info = f"{len(urls)} source(s)" if len(urls)>1 else "1 source"
-            mode_info = {"auto":f"auto","fixed":f"fixed/{target}",
-                         "rotate":f"rotate/{target} ~{coverage_pct}%"}.get(slot_mode,slot_mode)
-            msg = (f"{src_info} → {total} unique entries | {mode_info} | "
+            src_info = f"{len(urls)} source(s)" if len(urls) > 1 else "1 source"
+            cov_info = f" ~{coverage_pct}% coverage" if coverage_pct < 100 else ""
+            msg = (f"{src_info} → {total} unique entries | {target} list(s){cov_info} | "
                    f"{created}✚ {patched}↺ {deleted}✕")
-            self._log_sync(sub_id,"success",msg,total,pushed,created,deleted,dur)
+            self._log_sync(sub_id, "success", msg, total, pushed, created, deleted, dur)
             logger.info(f"━━ Done: '{sub['name']}' {msg} in {dur:.1f}s ━━")
 
         except Exception as e:
